@@ -11,7 +11,8 @@ import {
   STORAGE_KEYS,
   writeStorage,
 } from './services/storageService';
-import { deduplicateQuestions, emptyResponse, uid } from './services/questionService';
+import { deduplicateQuestions, emptyResponse, revalidateQuestion, uid } from './services/questionService';
+import type { DedupConflict } from './services/questionService';
 import { downloadJsonFile } from './services/backupService';
 
 // Layout & Common Components
@@ -26,6 +27,7 @@ import { AddQuestionModal } from './components/modals/AddQuestionModal';
 import { ImportModal } from './components/modals/ImportModal';
 import { BackupModal } from './components/modals/BackupModal';
 import { GeminiImportModal } from './components/modals/GeminiImportModal';
+import { ImportConflictsModal } from './components/modals/ImportConflictsModal';
 
 // Views
 import { OverviewPage } from './components/views/OverviewPage';
@@ -50,7 +52,16 @@ export function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [resultSessionId, setResultSessionId] = useState<string | null>(null);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
-  const [modal, setModal] = useState<'session' | 'question' | 'import' | 'backup' | 'gemini' | null>(null);
+  const [modal, setModal] = useState<
+    'session' | 'question' | 'import' | 'backup' | 'gemini' | 'conflicts' | null
+  >(null);
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [pendingImport, setPendingImport] = useState<{
+    fresh: Question[];
+    duplicatesCount: number;
+    conflicts: DedupConflict[];
+    warnings: string[];
+  } | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [tick, setTick] = useState(Date.now());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -230,26 +241,76 @@ export function App() {
     }
   }
 
+  function notifyImport(
+    freshCount: number,
+    duplicatesCount: number,
+    replacedCount: number,
+    warnings: string[]
+  ) {
+    let msg = `${freshCount} questão(ões) importada(s).`;
+    if (replacedCount > 0) msg += ` ${replacedCount} substituída(s) pela versão do arquivo.`;
+    if (duplicatesCount > 0) msg += ` ${duplicatesCount} idêntica(s) ignorada(s).`;
+    if (warnings.length > 0) msg += ` ${warnings.length} alerta(s) estruturais registrados.`;
+    notify(msg, warnings.length ? 'info' : 'success');
+  }
+
   function handleImportQuestions(incoming: Question[], warnings: string[]) {
-    const { fresh, duplicatesCount } = deduplicateQuestions(questions, incoming);
+    const { fresh, duplicatesCount, conflicts } = deduplicateQuestions(questions, incoming);
+
+    // Questões idênticas ao que já existe são ignoradas em silêncio (nada se perde). Questões
+    // divergentes NÃO: a versão do arquivo pode ser a correção, e descartá-la foi o defeito que
+    // tornava a fila de revisão um beco sem saída.
+    if (conflicts.length > 0) {
+      setPendingImport({ fresh, duplicatesCount, conflicts, warnings });
+      setModal('conflicts');
+      return;
+    }
+
     setQuestions((prev) => [...fresh, ...prev]);
     setModal(null);
+    notifyImport(fresh.length, duplicatesCount, 0, warnings);
+  }
 
-    let msg = `${fresh.length} questão(ões) importada(s).`;
-    if (duplicatesCount > 0) {
-      msg += ` ${duplicatesCount} duplicata(s) ignorada(s).`;
-    }
-    if (warnings.length > 0) {
-      msg += ` ${warnings.length} alerta(s) estruturais registrados.`;
-    }
+  function applyImportDecisions(decisions: Record<string, 'replace' | 'keep'>) {
+    if (!pendingImport) return;
+    const { fresh, duplicatesCount, conflicts, warnings } = pendingImport;
 
-    notify(msg, warnings.length ? 'info' : 'success');
+    const replacements = new Map<string, Question>();
+    conflicts.forEach((c) => {
+      if (decisions[c.existingId] === 'replace') replacements.set(c.existingId, c.incoming);
+    });
+
+    setQuestions((prev) => [
+      ...fresh,
+      ...prev.map((q) => {
+        const incoming = replacements.get(q.id);
+        if (!incoming) return q;
+        // Preserva o id e a data: sessões e respostas já gravadas apontam para este id.
+        return revalidateQuestion({ ...incoming, id: q.id, createdAt: q.createdAt });
+      }),
+    ]);
+
+    setPendingImport(null);
+    setModal(null);
+    notifyImport(fresh.length, duplicatesCount, replacements.size, warnings);
   }
 
   function handleAddQuestion(question: Question) {
     setQuestions((prev) => [question, ...prev]);
     setModal(null);
     notify('Questão adicionada ao banco.');
+  }
+
+  function handleUpdateQuestion(updated: Question) {
+    setQuestions((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
+    setModal(null);
+    setEditingQuestion(null);
+    notify(
+      updated.validationState === 'com_alertas'
+        ? 'Questão atualizada. Ainda há alertas pendentes nesta questão.'
+        : 'Questão atualizada e revalidada.',
+      updated.validationState === 'com_alertas' ? 'info' : 'success'
+    );
   }
 
   function handleClearQuestions() {
@@ -311,6 +372,10 @@ export function App() {
             onOpenImportModal={() => setModal('import')}
             onOpenGeminiModal={() => setModal('gemini')}
             onOpenAddQuestionModal={() => setModal('question')}
+            onEditQuestion={(question) => {
+              setEditingQuestion(question);
+              setModal('question');
+            }}
             onExportQuestions={exportQuestionsOnly}
             onClearQuestions={handleClearQuestions}
           />
@@ -464,9 +529,26 @@ export function App() {
 
       {modal === 'question' && (
         <AddQuestionModal
-          onClose={() => setModal(null)}
-          onSave={handleAddQuestion}
+          question={editingQuestion ?? undefined}
+          onClose={() => {
+            setModal(null);
+            setEditingQuestion(null);
+          }}
+          onSave={editingQuestion ? handleUpdateQuestion : handleAddQuestion}
           onError={(msg) => notify(msg, 'error')}
+        />
+      )}
+
+      {modal === 'conflicts' && pendingImport && (
+        <ImportConflictsModal
+          conflicts={pendingImport.conflicts}
+          freshCount={pendingImport.fresh.length}
+          identicalCount={pendingImport.duplicatesCount}
+          onClose={() => {
+            setPendingImport(null);
+            setModal(null);
+          }}
+          onApply={applyImportDecisions}
         />
       )}
 

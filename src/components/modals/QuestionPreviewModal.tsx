@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  Pencil,
   Play,
   ShieldCheck,
   X,
@@ -21,6 +22,7 @@ interface QuestionPreviewModalProps {
   selected: boolean;
   onToggleSelect: () => void;
   onResolve: () => void;
+  onEdit?: () => void;
   onClose: () => void;
   studentStatus?: {
     answered: boolean;
@@ -35,6 +37,7 @@ export function QuestionPreviewModal({
   selected,
   onToggleSelect,
   onResolve,
+  onEdit,
   onClose,
   studentStatus,
 }: QuestionPreviewModalProps) {
@@ -261,6 +264,12 @@ export function QuestionPreviewModal({
           >
             <Play size={16} /> Resolver agora
           </button>
+
+          {onEdit && (
+            <button type="button" className="button button-secondary" onClick={onEdit}>
+              <Pencil size={15} /> Editar
+            </button>
+          )}
 
           <button type="button" className="button button-secondary" onClick={onClose}>
             Fechar prévia

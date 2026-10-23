@@ -1,5 +1,5 @@
 import type { Difficulty, Question, QuestionFilters, ResponseRecord, Subject } from '../types';
-import { canonicalText, foldText } from './textService';
+import { canonicalText, comparableText, foldText } from './textService';
 
 export const SUBJECTS: Subject[] = ['Matemática', 'Física', 'Química', 'Português', 'Inglês', 'Redação', 'Outra'];
 export const DIFFICULTIES: Difficulty[] = ['Básica', 'Intermediária', 'Avançada'];
@@ -109,38 +109,115 @@ export function validateQuestion(q: Partial<Question>): { valid: boolean; errors
   };
 }
 
+/**
+ * Identidade de uma questão. O par `(documento, número)` é estável por definição; o texto do
+ * enunciado é apenas o último recurso, para questões sem número (cadastro manual, importação
+ * avulsa). Antes, a chave era `label|year|num|statement` — o que fazia a versão corrigida de uma
+ * questão nunca casar com a original, e a correção ser descartada como "duplicata".
+ */
 export function questionDeduplicationKey(q: Question): string {
-  const label = foldText(q.source.label);
-  const year = q.source.year ?? '';
-  const num = q.source.questionNumber ?? '';
-  // `foldText` remove acento, caixa e diferença de espaço: a mesma questão vinda do PDF em NFD
-  // e do CSV em NFC tem de colidir aqui.
-  const statement = foldText(q.statement);
-  return `${label}|${year}|${num}|${statement}`;
+  const document = `${foldText(q.source.label)}|${q.source.year ?? ''}|${foldText(q.source.phase ?? '')}`;
+  if (typeof q.source.questionNumber === 'number' && Number.isFinite(q.source.questionNumber)) {
+    return `${document}|n${q.source.questionNumber}`;
+  }
+  return `${document}|s:${foldText(q.statement)}`;
 }
 
-export function deduplicateQuestions(
-  existing: Question[],
-  incoming: Question[]
-): { fresh: Question[]; duplicatesCount: number } {
-  const seenHashes = new Set(existing.map(questionDeduplicationKey));
+export type DedupConflictKind = 'identico' | 'corrigido';
+
+export interface DedupConflict {
+  incoming: Question;
+  existing: Question;
+  existingId: string;
+  kind: DedupConflictKind;
+  /** Campos em que a versão recebida difere da que já está no banco. */
+  differences: string[];
+}
+
+export interface DedupResult {
+  fresh: Question[];
+  /** Idênticas ao que já existe: nada a decidir, nada perdido. */
+  duplicatesCount: number;
+  /** Mesma questão, conteúdo diferente. Exige decisão humana — não pode ser descartada em silêncio. */
+  conflicts: DedupConflict[];
+}
+
+function comparableAlternatives(q: Question): string {
+  return Object.entries(q.alternatives ?? {})
+    .filter(([, v]) => v && v.trim())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${canonicalText(v)}`)
+    .join('\u0001');
+}
+
+function contentDifferences(a: Question, b: Question): string[] {
+  const differences: string[] = [];
+  // `comparableText`: ignora caixa e diferença NFC/NFD (que não são mudança de conteúdo), mas
+  // preserva acento — corrigir "funcao" para "função" é mudança real e precisa aparecer.
+  if (comparableText(a.statement) !== comparableText(b.statement)) differences.push('enunciado');
+  if (comparableAlternatives(a) !== comparableAlternatives(b)) differences.push('alternativas');
+  if ((a.answerKey ?? '') !== (b.answerKey ?? '')) differences.push('gabarito');
+  if (foldText(a.topic) !== foldText(b.topic)) differences.push('assunto');
+  if (a.subject !== b.subject) differences.push('matéria');
+  return differences;
+}
+
+export function deduplicateQuestions(existing: Question[], incoming: Question[]): DedupResult {
+  const byKey = new Map<string, Question>();
+  existing.forEach((q) => byKey.set(questionDeduplicationKey(q), q));
   const seenIds = new Set(existing.map((q) => q.id));
+
   const fresh: Question[] = [];
+  const conflicts: DedupConflict[] = [];
   let duplicatesCount = 0;
 
   for (const question of incoming) {
-    const hash = questionDeduplicationKey(question);
-    if (seenHashes.has(hash)) {
-      duplicatesCount++;
+    const key = questionDeduplicationKey(question);
+    const existingQuestion = byKey.get(key);
+
+    if (existingQuestion) {
+      const differences = contentDifferences(existingQuestion, question);
+      if (differences.length === 0) {
+        duplicatesCount++;
+      } else {
+        conflicts.push({
+          incoming: question,
+          existing: existingQuestion,
+          existingId: existingQuestion.id,
+          kind: 'corrigido',
+          differences,
+        });
+      }
       continue;
     }
-    seenHashes.add(hash);
+
     const safeId = seenIds.has(question.id) ? uid('import') : question.id;
     seenIds.add(safeId);
-    fresh.push({ ...question, id: safeId });
+    const accepted = { ...question, id: safeId };
+    byKey.set(key, accepted);
+    fresh.push(accepted);
   }
 
-  return { fresh, duplicatesCount };
+  return { fresh, duplicatesCount, conflicts };
+}
+
+/**
+ * Revalida uma questão editada. Os alertas estruturais que o próprio app sabe recalcular
+ * (contagem de alternativas, gabarito fora das alternativas) são refeitos a partir do conteúdo
+ * atual; os que dependem da fonte original (figura, baixa confiança, anulada, número duplicado)
+ * são preservados, porque editar o texto não os resolve.
+ */
+export function revalidateQuestion(q: Question): Question {
+  const structural = [/alternativa identificada/i, /Gabarito oficial indica/i];
+  const kept = (q.alerts ?? []).filter((alert) => !structural.some((re) => re.test(alert)));
+  const { errors } = validateQuestion(q);
+  const alerts = [...kept, ...errors];
+
+  return {
+    ...q,
+    alerts,
+    validationState: !q.statement?.trim() ? 'incompleta' : alerts.length === 0 ? 'valida' : 'com_alertas',
+  };
 }
 
 export function filterQuestions(

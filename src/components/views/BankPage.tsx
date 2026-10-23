@@ -34,6 +34,7 @@ interface BankPageProps {
   onOpenImportModal: () => void;
   onOpenGeminiModal?: () => void;
   onOpenAddQuestionModal: () => void;
+  onEditQuestion?: (question: Question) => void;
   onExportQuestions: () => void;
   onClearQuestions?: () => void;
 }
@@ -49,6 +50,7 @@ export function BankPage({
   onOpenImportModal,
   onOpenGeminiModal,
   onOpenAddQuestionModal,
+  onEditQuestion,
   onExportQuestions,
   onClearQuestions,
 }: BankPageProps) {
@@ -722,6 +724,15 @@ export function BankPage({
           selected={selectedQuestionIds.includes(previewQuestion.id)}
           onToggleSelect={() => onToggleSelect(previewQuestion.id)}
           onResolve={() => onStartSingleQuestion(previewQuestion.id)}
+          onEdit={
+            onEditQuestion
+              ? () => {
+                  const target = previewQuestion;
+                  setPreviewQuestion(null);
+                  onEditQuestion(target);
+                }
+              : undefined
+          }
           onClose={() => setPreviewQuestion(null)}
           studentStatus={statusMap.get(previewQuestion.id)}
         />

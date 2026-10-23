@@ -1612,3 +1612,26 @@ h1, h2, h3, p { margin-top: 0; }
     grid-template-columns: 1fr;
   }
 }
+
+/* Conflitos de importação — mesma questão, conteúdo diferente */
+.conflict-bulk-actions { display: flex; gap: 14px; padding: 2px 0 10px; }
+.conflict-list { display: flex; flex-direction: column; gap: 10px; max-height: 46vh; overflow-y: auto; padding-right: 2px; }
+.conflict-item { border: 1px solid var(--line); border-radius: 11px; background: var(--surface); padding: 11px 12px; }
+.conflict-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.conflict-label { font-size: 10px; font-weight: 700; color: var(--green); letter-spacing: -.01em; }
+.conflict-changes { display: flex; gap: 5px; flex-wrap: wrap; }
+.conflict-chip { padding: 2px 7px; border-radius: 5px; background: var(--clay-soft); color: #8d4a37; font-size: 9px; font-weight: 600; }
+.conflict-body { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: stretch; }
+.conflict-version { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; background: #fbfaf6; min-width: 0; }
+.conflict-version.conflict-selected { border-color: #9db6a4; background: var(--green-soft); }
+.conflict-version-tag { display: block; font-size: 8px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin-bottom: 3px; }
+.conflict-version p { margin: 0 0 4px; font-size: 10px; line-height: 1.5; color: var(--ink-soft); }
+.conflict-version small { font-size: 8px; color: var(--muted); }
+.conflict-arrow { display: grid; place-items: center; color: var(--line-dark); }
+.conflict-choice { display: flex; gap: 6px; margin-top: 9px; }
+.conflict-choice-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border: 1px solid var(--line-dark); border-radius: 7px; background: transparent; color: var(--ink-soft); font-size: 9px; font-weight: 600; }
+.conflict-choice-btn.is-active { border-color: var(--green); background: var(--green); color: #f7f5ef; }
+@media (max-width: 640px) {
+  .conflict-body { grid-template-columns: 1fr; }
+  .conflict-arrow { display: none; }
+}

@@ -6,24 +6,33 @@ import {
   DIFFICULTIES,
   OPTION_LETTERS,
   SUBJECTS,
+  revalidateQuestion,
   uid,
   validateQuestion,
 } from '../../services/questionService';
 
 interface AddQuestionModalProps {
+  /** Quando presente, o modal edita esta questão em vez de criar uma nova. */
+  question?: Question;
   onClose: () => void;
   onSave: (question: Question) => void;
   onError: (message: string) => void;
 }
 
-export function AddQuestionModal({ onClose, onSave, onError }: AddQuestionModalProps) {
-  const [subject, setSubject] = useState<Subject>('Matemática');
-  const [difficulty, setDifficulty] = useState<Difficulty>('Intermediária');
-  const [topic, setTopic] = useState('');
-  const [statement, setStatement] = useState('');
-  const [alternatives, setAlternatives] = useState(['', '', '', '', '']);
-  const [answerKey, setAnswerKey] = useState('A');
-  const [explanation, setExplanation] = useState('');
+export function AddQuestionModal({ question, onClose, onSave, onError }: AddQuestionModalProps) {
+  const isEdit = Boolean(question);
+
+  const [subject, setSubject] = useState<Subject>(question?.subject ?? 'Matemática');
+  const [difficulty, setDifficulty] = useState<Difficulty>(question?.difficulty ?? 'Intermediária');
+  const [topic, setTopic] = useState(
+    question && question.topic !== 'Sem assunto definido' ? question.topic : ''
+  );
+  const [statement, setStatement] = useState(question?.statement ?? '');
+  const [alternatives, setAlternatives] = useState<string[]>(() =>
+    OPTION_LETTERS.map((letter) => question?.alternatives?.[letter] ?? '')
+  );
+  const [answerKey, setAnswerKey] = useState(question?.answerKey ?? 'A');
+  const [explanation, setExplanation] = useState(question?.explanation ?? '');
 
   const handleSubmit = () => {
     if (!statement.trim()) {
@@ -37,12 +46,14 @@ export function AddQuestionModal({ onClose, onSave, onError }: AddQuestionModalP
       )
     ) as Record<string, string>;
 
+    const finalAnswerKey = alternativesObj[answerKey] ? answerKey : undefined;
+
     const validation = validateQuestion({
       statement: statement.trim(),
       subject,
       difficulty,
       alternatives: alternativesObj,
-      answerKey: alternativesObj[answerKey] ? answerKey : undefined,
+      answerKey: finalAnswerKey,
     });
 
     if (!validation.valid) {
@@ -50,27 +61,51 @@ export function AddQuestionModal({ onClose, onSave, onError }: AddQuestionModalP
       return;
     }
 
-    const question: Question = {
-      id: uid('q'),
+    const keyChanged = isEdit && question!.answerKey !== finalAnswerKey;
+
+    const edited: Question = {
+      id: question?.id ?? uid('q'),
       subject,
       topic: topic.trim() || 'Sem assunto definido',
       difficulty,
       statement: statement.trim(),
       alternatives: alternativesObj,
-      answerKey: alternativesObj[answerKey] ? answerKey : undefined,
+      answerKey: finalAnswerKey,
       explanation: explanation.trim() || undefined,
-      source: { label: 'Cadastro manual' },
-      tags: [],
-      createdAt: new Date().toISOString(),
+      source: question
+        ? {
+            ...question.source,
+            // Gabarito alterado à mão deixa de ser "oficial": a procedência é do revisor.
+            gabaritoOficialSource: keyChanged ? undefined : question.source.gabaritoOficialSource,
+          }
+        : { label: 'Cadastro manual' },
+      tags: question?.tags ?? [],
+      createdAt: question?.createdAt ?? new Date().toISOString(),
+      hasOfficialKey: keyChanged ? false : question?.hasOfficialKey,
+      referencedFigures: question?.referencedFigures,
+      annulled: question?.annulled,
+      alerts: keyChanged
+        ? [
+            ...(question?.alerts ?? []),
+            `Gabarito alterado manualmente${
+              question?.answerKey ? ` (a fonte oficial indicava ${question.answerKey})` : ''
+            }.`,
+          ]
+        : question?.alerts,
+      validationState: question?.validationState,
     };
 
-    onSave(question);
+    onSave(isEdit ? revalidateQuestion(edited) : edited);
   };
 
   return (
     <ModalShell
-      title="Adicionar questão"
-      subtitle="Inclua uma questão ao banco local."
+      title={isEdit ? 'Editar questão' : 'Adicionar questão'}
+      subtitle={
+        isEdit
+          ? 'Corrija o conteúdo. Os alertas estruturais são recalculados ao salvar.'
+          : 'Inclua uma questão ao banco local.'
+      }
       onClose={onClose}
     >
       <div className="modal-form add-question-form">

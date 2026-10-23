@@ -44,6 +44,17 @@ export function foldText(input: unknown): string {
     .trim();
 }
 
+/**
+ * Comparação de conteúdo: canônica e sem caixa, mas **preservando acento**.
+ *
+ * É o meio-termo certo para decidir se uma questão mudou. `foldText` (que remove acento) é bom
+ * para busca, mas esconderia a correção de "funcao" para "função"; comparar o texto cru, por
+ * outro lado, transformaria toda diferença de caixa em "conflito" e afogaria o usuário em ruído.
+ */
+export function comparableText(input: unknown): string {
+  return canonicalText(input).toLocaleLowerCase('pt-BR');
+}
+
 /** Duas strings são iguais a menos de acento, caixa e espaço? */
 export function sameText(a: unknown, b: unknown): boolean {
   return foldText(a) === foldText(b);

@@ -27,8 +27,17 @@ const bank = [original];
 const r = deduplicateQuestions(bank, [corrigida]);
 console.log('chave original :', questionDeduplicationKey(original));
 console.log('chave corrigida:', questionDeduplicationKey(corrigida));
-console.log('aceitas:', r.fresh.length, '| recusadas como duplicata:', r.duplicatesCount);
-console.log('-> a correção entrou?', r.fresh.length === 1 ? 'SIM' : 'NAO (silenciosamente descartada)');
+console.log(
+  `aceitas como novas: ${r.fresh.length} | idênticas ignoradas: ${r.duplicatesCount} | conflitos p/ decisão: ${r.conflicts.length}`
+);
+console.log(
+  '-> a correção entrou?',
+  r.fresh.length === 1
+    ? 'SIM, como questão nova (errado: duplicaria)'
+    : r.conflicts.length === 1
+    ? `SIM, como conflito a decidir (diferenças: ${r.conflicts[0].differences.join(', ')})`
+    : 'NAO (descartada em silêncio)'
+);
 
 // ---------- B: numeração ausente -> duas questões com o mesmo número -> gabarito trocado ----------
 line('B) questão sem questionNumber desloca o número e rouba o gabarito');
