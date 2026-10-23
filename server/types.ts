@@ -1,4 +1,11 @@
-export type ExtractionJobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
+export type ExtractionJobStatus =
+  | 'queued'
+  | 'processing'
+  | 'completed'
+  /** Terminou, mas faltam questões em relação ao esperado. Não é sucesso silencioso. */
+  | 'completed_with_gaps'
+  | 'failed'
+  | 'cancelled';
 
 export type Subject = 'Matemática' | 'Física' | 'Química' | 'Português' | 'Inglês' | 'Redação' | 'Outra';
 export type Difficulty = 'Básica' | 'Intermediária' | 'Avançada';
@@ -76,5 +83,14 @@ export interface ExtractionJob {
   };
   questions: ReconciledQuestion[];
   reviewQueue: ReconciledQuestion[];
+  /**
+   * Quantas questões o documento deveria ter. Vem do gabarito oficial (uma linha por questão),
+   * que é um oráculo de contagem de graça. Sem isso, perder 8 de 48 passava como sucesso.
+   */
+  expectedCount?: number;
+  /** Números ausentes entre 1 e expectedCount. */
+  missingNumbers?: number[];
+  /** Avisos de integridade do job (contagem, numeração, gabarito). */
+  alerts?: string[];
   error?: string;
 }

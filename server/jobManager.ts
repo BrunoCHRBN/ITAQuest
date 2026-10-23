@@ -1,5 +1,6 @@
 import fs from 'fs';
-import type { ExtractionJob } from './types';
+import type { ExtractedAnswerKeyItem, ExtractionJob } from './types';
+import { auditCoverage } from './integrity';
 import {
   computeFileChecksum,
   extractAnswerKeyFromPdf,
@@ -59,7 +60,7 @@ export function getJob(jobId: string): ExtractionJob | undefined {
 export function cancelJob(jobId: string): boolean {
   const job = jobs.get(jobId);
   if (!job) return false;
-  if (job.status === 'completed' || job.status === 'failed') return false;
+  if (job.status === 'completed' || job.status === 'completed_with_gaps' || job.status === 'failed') return false;
 
   job.status = 'cancelled';
   job.step = 'Processamento cancelado pelo usuário.';
@@ -106,7 +107,7 @@ async function processJob(jobId: string, examPath: string, answerKeyPath?: strin
     job.progress = 60;
     job.updatedAt = new Date().toISOString();
 
-    let answerKeys = undefined;
+    let answerKeys: ExtractedAnswerKeyItem[] | undefined;
     if (answerKeyPath) {
       job.step = 'Analisando documento de gabarito oficial...';
       answerKeys = await extractAnswerKeyFromPdf(answerKeyPath, undefined, (msg) => {
@@ -129,16 +130,34 @@ async function processJob(jobId: string, examPath: string, answerKeyPath?: strin
       answerKeys,
       examFileName: job.examFileName,
       examChecksum: job.examChecksum,
+      answerKeyChecksum: job.answerKeyChecksum,
       metadata: job.metadata,
       promptVersion: examResult.promptVersion,
       model: examResult.model,
     });
 
-    job.status = 'completed';
-    job.progress = 100;
-    job.step = `Extração concluída: ${reconciled.questions.length} questões identificadas (${reconciled.reviewQueue.length} na fila de revisão por exceção).`;
+    // O gabarito é um oráculo de contagem: uma linha por questão. Usá-lo para conferir a
+    // cobertura é o que impede uma perda silenciosa de passar como sucesso.
+    const coverage = auditCoverage({
+      questions: reconciled.questions,
+      expectedCount: answerKeys?.length,
+    });
+
+    job.expectedCount = coverage.expectedCount;
+    job.missingNumbers = coverage.missingNumbers;
+    job.alerts = coverage.alerts;
     job.questions = reconciled.questions;
     job.reviewQueue = reconciled.reviewQueue;
+
+    if (coverage.verifiable && !coverage.complete) {
+      job.status = 'completed_with_gaps';
+      job.progress = 100;
+      job.step = `Extração concluída com lacunas: ${reconciled.questions.length} questões identificadas, ${coverage.missingNumbers.length} ausente(s) em relação ao gabarito (${coverage.expectedCount}).`;
+    } else {
+      job.status = 'completed';
+      job.progress = 100;
+      job.step = `Extração concluída: ${reconciled.questions.length} questões identificadas (${reconciled.reviewQueue.length} na fila de revisão por exceção).`;
+    }
     job.updatedAt = new Date().toISOString();
   } catch (err) {
     if (job.status !== 'cancelled') {

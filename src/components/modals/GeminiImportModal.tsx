@@ -44,7 +44,7 @@ interface ReconciledQuestionBackend {
 
 interface ExtractionJobResponse {
   id: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  status: 'queued' | 'processing' | 'completed' | 'completed_with_gaps' | 'failed' | 'cancelled';
   progress: number;
   step: string;
   examFileName: string;
@@ -58,6 +58,9 @@ interface ExtractionJobResponse {
   };
   questions: ReconciledQuestionBackend[];
   reviewQueue: ReconciledQuestionBackend[];
+  expectedCount?: number;
+  missingNumbers?: number[];
+  alerts?: string[];
   error?: string;
 }
 
@@ -108,7 +111,12 @@ export function GeminiImportModal({ onClose, onImport, onError }: GeminiImportMo
         const data: ExtractionJobResponse = await res.json();
         setJobData(data);
 
-        if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
+        if (
+          data.status === 'completed' ||
+          data.status === 'completed_with_gaps' ||
+          data.status === 'failed' ||
+          data.status === 'cancelled'
+        ) {
           if (pollIntervalRef.current) {
             window.clearInterval(pollIntervalRef.current);
             pollIntervalRef.current = null;
@@ -227,7 +235,10 @@ export function GeminiImportModal({ onClose, onImport, onError }: GeminiImportMo
       onClose={onClose}
     >
       <div className="modal-form">
-        {!jobData || (jobData.status !== 'completed' && jobData.status !== 'failed') ? (
+        {!jobData ||
+        (jobData.status !== 'completed' &&
+          jobData.status !== 'completed_with_gaps' &&
+          jobData.status !== 'failed') ? (
           <>
             <div className="form-grid-two">
               <label className="field-label">
@@ -423,6 +434,40 @@ export function GeminiImportModal({ onClose, onImport, onError }: GeminiImportMo
                 <small style={{ fontSize: 8, color: '#91968e' }}>rastreabilidade do PDF</small>
               </div>
             </div>
+
+            {jobData.alerts && jobData.alerts.length > 0 && (
+              <div
+                style={{
+                  background: '#fbece8',
+                  border: '1px solid #e4c4be',
+                  borderRadius: 10,
+                  padding: '10px 12px',
+                  marginBottom: 14,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#9a4c38',
+                    marginBottom: 4,
+                  }}
+                >
+                  <AlertCircle size={14} />
+                  {jobData.status === 'completed_with_gaps'
+                    ? 'A extração não cobriu o documento inteiro'
+                    : 'Aviso de integridade'}
+                </div>
+                {jobData.alerts.map((a, i) => (
+                  <p key={i} style={{ margin: '2px 0', fontSize: 11, color: '#7d4030', lineHeight: 1.5 }}>
+                    {a}
+                  </p>
+                ))}
+              </div>
+            )}
 
             {/* Tab filter for exception queue */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, borderBottom: '1px solid #e5e2d8', paddingBottom: 8 }}>
