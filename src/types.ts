@@ -98,6 +98,18 @@ export type QuestionSortOption =
   | 'materia'
   | 'dificuldade';
 
+/**
+ * Eixo de validação do acervo. Fica separado do estado de resolução de propósito: são perguntas
+ * diferentes ("esta questão está correta?" vs "eu já resolvi esta questão?").
+ */
+export type QuestionValidationFilter =
+  | 'todas'
+  | 'com_alertas'
+  | 'sem_gabarito'
+  | 'com_figura'
+  | 'incompleta'
+  | 'valida';
+
 export interface QuestionFilters {
   query: string;
   subject: string;
@@ -106,6 +118,7 @@ export interface QuestionFilters {
   year?: string;
   topic?: string;
   status?: QuestionStatusFilter;
+  validation?: QuestionValidationFilter;
   sortBy?: QuestionSortOption;
 }
 

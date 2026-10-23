@@ -270,6 +270,27 @@ export function filterQuestions(
       return false;
     }
 
+    // Validation axis (if provided)
+    if (filters.validation && filters.validation !== 'todas') {
+      switch (filters.validation) {
+        case 'com_alertas':
+          if (!q.alerts || q.alerts.length === 0) return false;
+          break;
+        case 'sem_gabarito':
+          if (q.answerKey) return false;
+          break;
+        case 'com_figura':
+          if (!q.referencedFigures || q.referencedFigures.length === 0) return false;
+          break;
+        case 'incompleta':
+          if (q.validationState !== 'incompleta') return false;
+          break;
+        case 'valida':
+          if (q.validationState !== 'valida') return false;
+          break;
+      }
+    }
+
     // Resolution Status (if statusMap is provided)
     if (filters.status && filters.status !== 'todas' && statusMap) {
       const status = statusMap.get(q.id);

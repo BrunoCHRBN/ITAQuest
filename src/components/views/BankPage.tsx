@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
   CheckCircle2,
   ChevronLeft,
@@ -16,7 +17,14 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import type { Question, QuestionFilters, QuestionSortOption, QuestionStatusFilter, StudySession } from '../../types';
+import type {
+  Question,
+  QuestionFilters,
+  QuestionSortOption,
+  QuestionStatusFilter,
+  QuestionValidationFilter,
+  StudySession,
+} from '../../types';
 import { PageHeader } from '../layout/PageHeader';
 import { QuestionRow } from '../question/QuestionRow';
 import { QuestionPreviewModal } from '../modals/QuestionPreviewModal';
@@ -61,6 +69,7 @@ export function BankPage({
   const [difficultyFilter, setDifficultyFilter] = useState('Todas');
   const [sourceFilter, setSourceFilter] = useState('Todas');
   const [statusFilter, setStatusFilter] = useState<QuestionStatusFilter>('todas');
+  const [validationFilter, setValidationFilter] = useState<QuestionValidationFilter>('todas');
   const [sortBy, setSortBy] = useState<QuestionSortOption>('recentes');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
@@ -107,11 +116,12 @@ export function BankPage({
         year: yearFilter,
         topic: topicFilter,
         status: statusFilter,
+        validation: validationFilter,
         sortBy,
       },
       statusMap
     );
-  }, [questions, query, subjectFilter, difficultyFilter, sourceFilter, yearFilter, topicFilter, statusFilter, sortBy, statusMap]);
+  }, [questions, query, subjectFilter, difficultyFilter, sourceFilter, yearFilter, topicFilter, statusFilter, validationFilter, sortBy, statusMap]);
 
   // Reset page when filters change
   const handleQueryChange = (val: string) => {
@@ -132,6 +142,7 @@ export function BankPage({
     setDifficultyFilter('Todas');
     setSourceFilter('Todas');
     setStatusFilter('todas');
+    setValidationFilter('todas');
     setSortBy('recentes');
     setPage(1);
   };
@@ -149,8 +160,20 @@ export function BankPage({
     difficultyFilter !== 'Todas',
     sourceFilter !== 'Todas',
     statusFilter !== 'todas',
+    validationFilter !== 'todas',
     sortBy !== 'recentes',
   ].filter(Boolean).length;
+
+  // Pendências de validação: o que a extração sinalizou e ninguém conferiu ainda.
+  const triage = useMemo(
+    () => ({
+      comAlertas: questions.filter((q) => (q.alerts?.length ?? 0) > 0).length,
+      semGabarito: questions.filter((q) => !q.answerKey).length,
+      comFigura: questions.filter((q) => (q.referencedFigures?.length ?? 0) > 0).length,
+    }),
+    [questions]
+  );
+  const triageTotal = triage.comAlertas + triage.semGabarito + triage.comFigura;
 
   // Pagination slicing
   const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(filteredQuestions.length / pageSize)) : 1;
@@ -214,6 +237,54 @@ export function BankPage({
           </>
         }
       />
+
+      {/* Triage strip: what the extraction flagged and nobody checked yet */}
+      {questions.length > 0 && triageTotal > 0 && (
+        <div className="triage-strip" role="status">
+          <span className="triage-title">
+            <AlertTriangle size={15} /> Triagem pendente
+          </span>
+          <div className="triage-actions">
+            {triage.comAlertas > 0 && (
+              <button
+                type="button"
+                className={`triage-chip ${validationFilter === 'com_alertas' ? 'is-active' : ''}`}
+                onClick={() => {
+                  setValidationFilter(validationFilter === 'com_alertas' ? 'todas' : 'com_alertas');
+                  setPage(1);
+                }}
+              >
+                {triage.comAlertas} com alerta de extração
+              </button>
+            )}
+            {triage.semGabarito > 0 && (
+              <button
+                type="button"
+                className={`triage-chip ${validationFilter === 'sem_gabarito' ? 'is-active' : ''}`}
+                onClick={() => {
+                  setValidationFilter(validationFilter === 'sem_gabarito' ? 'todas' : 'sem_gabarito');
+                  setPage(1);
+                }}
+              >
+                {triage.semGabarito} sem gabarito
+              </button>
+            )}
+            {triage.comFigura > 0 && (
+              <button
+                type="button"
+                className={`triage-chip ${validationFilter === 'com_figura' ? 'is-active' : ''}`}
+                onClick={() => {
+                  setValidationFilter(validationFilter === 'com_figura' ? 'todas' : 'com_figura');
+                  setPage(1);
+                }}
+              >
+                {triage.comFigura} referenciam figura
+              </button>
+            )}
+          </div>
+          <span className="triage-note">Abra a questão e use Editar para corrigir.</span>
+        </div>
+      )}
 
       {/* Search and Main Toolbar */}
       <div className="bank-toolbar">
@@ -370,6 +441,24 @@ export function BankPage({
             </select>
           </label>
 
+          <label>
+            Validação
+            <select
+              value={validationFilter}
+              onChange={(e) => {
+                setValidationFilter(e.target.value as QuestionValidationFilter);
+                setPage(1);
+              }}
+            >
+              <option value="todas">Todas</option>
+              <option value="com_alertas">Com alerta de extração</option>
+              <option value="sem_gabarito">Sem gabarito</option>
+              <option value="com_figura">Referenciam figura</option>
+              <option value="incompleta">Incompletas</option>
+              <option value="valida">Validadas</option>
+            </select>
+          </label>
+
           <button type="button" className="text-button clear-filters" onClick={handleClearFilters}>
             <RotateCcw size={13} /> Limpar filtros
           </button>
@@ -492,6 +581,33 @@ export function BankPage({
                     setPage(1);
                   }}
                   aria-label="Remover filtro de status"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+
+            {validationFilter !== 'todas' && (
+              <span className="filter-chip">
+                Validação:{' '}
+                <b>
+                  {validationFilter === 'com_alertas'
+                    ? 'Com alerta'
+                    : validationFilter === 'sem_gabarito'
+                    ? 'Sem gabarito'
+                    : validationFilter === 'com_figura'
+                    ? 'Referencia figura'
+                    : validationFilter === 'incompleta'
+                    ? 'Incompletas'
+                    : 'Validadas'}
+                </b>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValidationFilter('todas');
+                    setPage(1);
+                  }}
+                  aria-label="Remover filtro de validação"
                 >
                   <X size={12} />
                 </button>
