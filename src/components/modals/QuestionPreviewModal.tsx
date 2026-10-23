@@ -72,6 +72,12 @@ export function QuestionPreviewModal({
 
             <span className="difficulty-badge">{question.difficulty}</span>
 
+            {question.annulled && (
+              <span className="audit-badge audit-badge-warning" title="Anulada pelo gabarito oficial: conta como correta para todos os candidatos">
+                <AlertTriangle size={14} /> Anulada
+              </span>
+            )}
+
             {question.hasOfficialKey && (
               <span className="audit-badge audit-badge-official" title="Conferido contra folha oficial de gabarito">
                 <ShieldCheck size={14} /> Gabarito Oficial

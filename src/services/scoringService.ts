@@ -52,9 +52,13 @@ export function calculateSessionStats(session: StudySession, questions: Question
       if (!q) return null;
       const r = session.responses[id] ?? { notes: '', markedForReview: false, checked: false };
       const isAnswered = Boolean(r.selectedOption || (r.notes && r.notes.trim()));
-      const hasKey = Boolean(q.answerKey);
-      const isCorrect = Boolean(hasKey && r.selectedOption && q.answerKey === r.selectedOption);
-      const isWrong = Boolean(hasKey && r.selectedOption && q.answerKey !== r.selectedOption);
+      // Questão anulada conta como correta para todos os candidatos (regra do gabarito oficial).
+      // Antes, ela caía em "sem gabarito" e saía do numerador E do denominador: a nota era
+      // calculada sobre 46 em vez de 48.
+      const isAnnulled = q.annulled === true;
+      const hasKey = Boolean(q.answerKey) || isAnnulled;
+      const isCorrect = isAnnulled || Boolean(q.answerKey && r.selectedOption && q.answerKey === r.selectedOption);
+      const isWrong = !isAnnulled && Boolean(q.answerKey && r.selectedOption && q.answerKey !== r.selectedOption);
 
       return {
         question: q,
@@ -71,7 +75,9 @@ export function calculateSessionStats(session: StudySession, questions: Question
   const answeredCount = items.filter((i) => i.isAnswered).length;
   const unansweredCount = total - answeredCount;
   const markedCount = items.filter((i) => i.response.markedForReview).length;
-  const withKeyCount = items.filter((i) => i.hasKey && i.response.selectedOption).length;
+  const withKeyCount = items.filter(
+    (i) => i.hasKey && (i.response.selectedOption || i.question.annulled === true)
+  ).length;
   const correctCount = items.filter((i) => i.isCorrect).length;
   const wrongCount = withKeyCount - correctCount;
   const accuracy = withKeyCount > 0 ? Math.round((correctCount / withKeyCount) * 100) : 0;
@@ -136,9 +142,12 @@ export function getQuestionResolutionMap(
       const resp = session.responses[qId];
       const q = questionMap.get(qId);
       const isAnswered = Boolean(resp?.selectedOption || (resp?.notes && resp.notes.trim()));
-      const hasKey = Boolean(q?.answerKey);
-      const isCorrect = Boolean(hasKey && resp?.selectedOption && q?.answerKey === resp.selectedOption);
-      const isWrong = Boolean(hasKey && resp?.selectedOption && q?.answerKey !== resp.selectedOption);
+      const isAnnulled = q?.annulled === true;
+      const hasKey = Boolean(q?.answerKey) || isAnnulled;
+      const isCorrect =
+        isAnnulled || Boolean(q?.answerKey && resp?.selectedOption && q?.answerKey === resp.selectedOption);
+      const isWrong =
+        !isAnnulled && Boolean(q?.answerKey && resp?.selectedOption && q?.answerKey !== resp.selectedOption);
       const markedForReview = Boolean(resp?.markedForReview);
 
       const existing = statusMap.get(qId);
@@ -181,8 +190,12 @@ export function calculateOverviewStats(sessions: StudySession[], questions: Ques
       .filter((x) => x.q && (x.r?.selectedOption || (x.r?.notes && x.r.notes.trim())))
   );
 
-  const gradedResponses = allResponses.filter(({ q, r }) => Boolean(q?.answerKey && r?.selectedOption));
-  const correctCount = gradedResponses.filter(({ q, r }) => q?.answerKey === r?.selectedOption).length;
+  const gradedResponses = allResponses.filter(
+    ({ q, r }) => Boolean(q && ((q.answerKey && r?.selectedOption) || q.annulled))
+  );
+  const correctCount = gradedResponses.filter(
+    ({ q, r }) => q?.annulled === true || q?.answerKey === r?.selectedOption
+  ).length;
   const wrongCount = gradedResponses.length - correctCount;
   const overallAccuracy = gradedResponses.length ? Math.round((correctCount / gradedResponses.length) * 100) : 0;
 
@@ -243,8 +256,10 @@ export function calculateSubjectStats(
 
   return subjects.map((subject) => {
     const rows = allResponses.filter(({ q }) => q?.subject === subject);
-    const correct = rows.filter(({ q, r }) => q?.answerKey && q.answerKey === r?.selectedOption).length;
-    const graded = rows.filter(({ q }) => Boolean(q?.answerKey)).length;
+    const correct = rows.filter(
+      ({ q, r }) => q?.annulled === true || (q?.answerKey && q.answerKey === r?.selectedOption)
+    ).length;
+    const graded = rows.filter(({ q }) => Boolean(q?.answerKey || q?.annulled)).length;
     return {
       subject,
       count: rows.length,

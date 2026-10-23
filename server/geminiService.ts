@@ -477,10 +477,14 @@ export function reconcileExtractedData(params: {
     let answerKey: string | undefined;
     let hasOfficialKey = false;
     let officialSource: string | undefined;
+    let annulled = false;
 
     if (officialKeyItem) {
       if (officialKeyItem.isCancelledOrAnnulled) {
-        alerts.push('Questão anulada no gabarito oficial.');
+        annulled = true;
+        alerts.push(
+          'Questão anulada no gabarito oficial. Conta como correta para todos os candidatos — não é ausência de gabarito.'
+        );
       } else if (officialKeyItem.officialAnswer) {
         const letter = officialKeyItem.officialAnswer.toUpperCase().trim();
         hasOfficialKey = true;
@@ -537,6 +541,7 @@ export function reconcileExtractedData(params: {
       validationState,
       alerts,
       hasOfficialKey,
+      annulled,
       referencedFigures: figures,
     };
 

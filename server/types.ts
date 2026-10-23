@@ -62,6 +62,8 @@ export interface ReconciledQuestion {
   validationState: 'valida' | 'com_alertas' | 'incompleta';
   alerts: string[];
   hasOfficialKey: boolean;
+  /** Anulada pelo gabarito oficial: conta como correta para todos, não é "sem gabarito". */
+  annulled?: boolean;
   referencedFigures: string[];
 }
 

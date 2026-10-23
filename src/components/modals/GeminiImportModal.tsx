@@ -39,6 +39,7 @@ interface ReconciledQuestionBackend {
   validationState: 'valida' | 'com_alertas' | 'incompleta';
   alerts: string[];
   hasOfficialKey: boolean;
+  annulled?: boolean;
   referencedFigures: string[];
 }
 
@@ -222,6 +223,7 @@ export function GeminiImportModal({
       validationState: q.validationState,
       alerts: q.alerts,
       hasOfficialKey: q.hasOfficialKey,
+      annulled: q.annulled,
       referencedFigures: q.referencedFigures,
     }));
 
@@ -538,12 +540,16 @@ export function GeminiImportModal({
                         padding: '2px 6px',
                         borderRadius: 5,
                         fontSize: 9,
-                        background: q.hasOfficialKey ? '#e3ece3' : '#f4eee1',
-                        color: q.hasOfficialKey ? '#2b583f' : '#8a744c',
+                        background: q.annulled ? '#f2ecdc' : q.hasOfficialKey ? '#e3ece3' : '#f4eee1',
+                        color: q.annulled ? '#8a744c' : q.hasOfficialKey ? '#2b583f' : '#8a744c',
                         fontWeight: 600,
                       }}
                     >
-                      {q.hasOfficialKey ? `Gabarito Oficial: ${q.answerKey}` : 'Sem gabarito oficial'}
+                      {q.annulled
+                        ? 'Anulada (correta para todos)'
+                        : q.hasOfficialKey
+                        ? `Gabarito Oficial: ${q.answerKey}`
+                        : 'Sem gabarito oficial'}
                     </span>
                   </div>
 
