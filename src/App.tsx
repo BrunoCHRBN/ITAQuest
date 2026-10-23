@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Menu, Search } from 'lucide-react';
 import { seedQuestions } from './data/seed';
-import type { Notice, Question, ResponseRecord, StudySession, View } from './types';
+import type { ImportBatch, Notice, Question, ResponseRecord, StudySession, View } from './types';
 
 // Services
 import {
@@ -14,6 +14,7 @@ import {
 import { deduplicateQuestions, emptyResponse, revalidateQuestion, uid } from './services/questionService';
 import type { DedupConflict } from './services/questionService';
 import { downloadJsonFile } from './services/backupService';
+import { makeImportBatch, undoBatch } from './services/batchService';
 
 // Layout & Common Components
 import { Sidebar } from './components/layout/Sidebar';
@@ -47,6 +48,9 @@ export function App() {
   );
   const [sessions, setSessions] = useState<StudySession[]>(() =>
     readStorage(STORAGE_KEYS.sessions, [])
+  );
+  const [batches, setBatches] = useState<ImportBatch[]>(() =>
+    readStorage(STORAGE_KEYS.batches, [])
   );
   const [view, setView] = useState<View>('overview');
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -82,6 +86,10 @@ export function App() {
   useEffect(() => {
     writeStorage(STORAGE_KEYS.sessions, sessions);
   }, [sessions]);
+
+  useEffect(() => {
+    writeStorage(STORAGE_KEYS.batches, batches);
+  }, [batches]);
 
   // Timer tick for resolver
   useEffect(() => {
@@ -254,6 +262,15 @@ export function App() {
     notify(msg, warnings.length ? 'info' : 'success');
   }
 
+  function makeBatch(
+    id: string,
+    representative: Question[],
+    created: string[],
+    replaced: Array<{ id: string; previous: Question }>
+  ): ImportBatch {
+    return makeImportBatch({ id, representative, created, replaced });
+  }
+
   function handleImportQuestions(incoming: Question[], warnings: string[]) {
     const { fresh, duplicatesCount, conflicts } = deduplicateQuestions(questions, incoming);
 
@@ -266,7 +283,11 @@ export function App() {
       return;
     }
 
-    setQuestions((prev) => [...fresh, ...prev]);
+    const batchId = uid('batch');
+    const stamped = fresh.map((q) => ({ ...q, batchId }));
+
+    setQuestions((prev) => [...stamped, ...prev]);
+    setBatches((prev) => [makeBatch(batchId, stamped, stamped.map((q) => q.id), []), ...prev].slice(0, 50));
     setModal(null);
     notifyImport(fresh.length, duplicatesCount, 0, warnings);
   }
@@ -280,19 +301,53 @@ export function App() {
       if (decisions[c.existingId] === 'replace') replacements.set(c.existingId, c.incoming);
     });
 
-    setQuestions((prev) => [
-      ...fresh,
-      ...prev.map((q) => {
-        const incoming = replacements.get(q.id);
-        if (!incoming) return q;
-        // Preserva o id e a data: sessões e respostas já gravadas apontam para este id.
-        return revalidateQuestion({ ...incoming, id: q.id, createdAt: q.createdAt });
-      }),
-    ]);
+    const batchId = uid('batch');
+    const created = fresh.map((q) => ({ ...q, batchId }));
+    const replaced: Array<{ id: string; previous: Question }> = [];
+
+    const merged = questions.map((q) => {
+      const incoming = replacements.get(q.id);
+      if (!incoming) return q;
+      // A versão anterior fica guardada no lote: sem isso, "desfazer" não seria desfazer.
+      replaced.push({ id: q.id, previous: q });
+      // Preserva o id e a data: sessões e respostas já gravadas apontam para este id.
+      return revalidateQuestion({ ...incoming, id: q.id, createdAt: q.createdAt, batchId });
+    });
+
+    setQuestions([...created, ...merged]);
+    setBatches((prev) => [
+      makeBatch(
+        batchId,
+        [...created, ...conflicts.map((c) => c.incoming)],
+        created.map((q) => q.id),
+        replaced
+      ),
+      ...prev,
+    ].slice(0, 50));
 
     setPendingImport(null);
     setModal(null);
     notifyImport(fresh.length, duplicatesCount, replacements.size, warnings);
+  }
+
+  function undoLastImport() {
+    const last = batches[0];
+    if (!last) return;
+
+    const createdIds = new Set(last.created);
+
+    setQuestions((prev) => undoBatch(prev, last));
+    setBatches((prev) => prev.slice(1));
+    setSelectedQuestionIds((prev) => prev.filter((id) => !createdIds.has(id)));
+
+    notify(
+      `Importação de ${new Date(last.createdAt).toLocaleString('pt-BR')} desfeita: ${
+        last.created.length
+      } questão(ões) removida(s)${
+        last.replaced.length ? `, ${last.replaced.length} restaurada(s) à versão anterior` : ''
+      }.`,
+      'info'
+    );
   }
 
   function handleAddQuestion(question: Question) {
@@ -378,6 +433,8 @@ export function App() {
             }}
             onExportQuestions={exportQuestionsOnly}
             onClearQuestions={handleClearQuestions}
+            lastBatch={batches[0] ?? null}
+            onUndoImport={undoLastImport}
           />
         );
       case 'sessions':
@@ -573,6 +630,9 @@ export function App() {
 
       {modal === 'gemini' && (
         <GeminiImportModal
+          knownChecksums={questions
+            .map((q) => q.source.checksum)
+            .filter((c): c is string => Boolean(c))}
           onClose={() => setModal(null)}
           onImport={handleImportQuestions}
           onError={(msg) => notify(msg, 'error')}

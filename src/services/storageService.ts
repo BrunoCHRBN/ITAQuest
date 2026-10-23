@@ -1,6 +1,7 @@
 export const STORAGE_KEYS = {
   questions: 'rotina-ita.questions.v1',
   sessions: 'rotina-ita.sessions.v1',
+  batches: 'rotina-ita.batches.v1',
   schemaVersion: 'rotina-ita.schema_version',
 } as const;
 

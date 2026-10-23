@@ -56,6 +56,30 @@ export interface Question {
    * calculada sobre 46 em vez de 48.
    */
   annulled?: boolean;
+  /** Lote de importação que trouxe esta questão. É o que permite desfazer uma importação. */
+  batchId?: string;
+}
+
+/**
+ * Registro de uma importação. Sem isso, o banco é write-once: se 90 questões de uma extração
+ * ruim entram, a única saída era "Zerar banco".
+ *
+ * Guarda também as versões substituídas, para que "desfazer" seja completo.
+ */
+export interface ImportBatch {
+  id: string;
+  createdAt: string;
+  source: 'arquivo' | 'gemini' | 'manual';
+  document?: {
+    label: string;
+    year?: number;
+    phase?: string;
+    checksum?: string;
+  };
+  /** Ids das questões criadas por este lote. */
+  created: string[];
+  /** Questões que este lote substituiu, com a versão anterior preservada. */
+  replaced: Array<{ id: string; previous: Question }>;
 }
 
 export type TriageRound = 'imediata' | 'trabalhosa' | 'combate';

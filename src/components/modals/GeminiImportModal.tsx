@@ -84,9 +84,16 @@ interface GeminiImportModalProps {
   onClose: () => void;
   onImport: (questions: Question[], warnings: string[]) => void;
   onError: (message: string) => void;
+  /** Checksums SHA-256 dos PDFs já ingeridos no banco. */
+  knownChecksums?: string[];
 }
 
-export function GeminiImportModal({ onClose, onImport, onError }: GeminiImportModalProps) {
+export function GeminiImportModal({
+  onClose,
+  onImport,
+  onError,
+  knownChecksums = [],
+}: GeminiImportModalProps) {
   const [examFile, setExamFile] = useState<File | null>(null);
   const [answerKeyFile, setAnswerKeyFile] = useState<File | null>(null);
   const [institution, setInstitution] = useState('ITA');
@@ -434,6 +441,19 @@ export function GeminiImportModal({ onClose, onImport, onError }: GeminiImportMo
                 <small style={{ fontSize: 8, color: '#91968e' }}>rastreabilidade do PDF</small>
               </div>
             </div>
+
+            {knownChecksums.includes(jobData.examChecksum) && (
+              <div className="import-warning" style={{ marginBottom: 14 }}>
+                <AlertCircle size={17} />
+                <p>
+                  Este PDF já foi importado neste banco (checksum{' '}
+                  <code>{jobData.examChecksum.slice(0, 10)}…</code>). Reimportar não duplica em
+                  silêncio: as questões idênticas serão ignoradas e as divergentes virarão conflitos
+                  para você decidir. Se o objetivo é reverter, use <b>Desfazer última importação</b>{' '}
+                  no Banco.
+                </p>
+              </div>
+            )}
 
             {jobData.alerts && jobData.alerts.length > 0 && (
               <div

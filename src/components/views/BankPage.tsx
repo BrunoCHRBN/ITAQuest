@@ -14,10 +14,12 @@ import {
   Search,
   SlidersHorizontal,
   Trash2,
+  Undo2,
   Upload,
   X,
 } from 'lucide-react';
 import type {
+  ImportBatch,
   Question,
   QuestionFilters,
   QuestionSortOption,
@@ -45,6 +47,8 @@ interface BankPageProps {
   onEditQuestion?: (question: Question) => void;
   onExportQuestions: () => void;
   onClearQuestions?: () => void;
+  lastBatch?: ImportBatch | null;
+  onUndoImport?: () => void;
 }
 
 export function BankPage({
@@ -61,6 +65,8 @@ export function BankPage({
   onEditQuestion,
   onExportQuestions,
   onClearQuestions,
+  lastBatch,
+  onUndoImport,
 }: BankPageProps) {
   const [query, setQuery] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('Todas');
@@ -810,8 +816,37 @@ export function BankPage({
 
       {/* Bank Footer */}
       <div className="bank-footer">
-        <span>Você está vendo o acervo disponível localmente ({questions.length} questões).</span>
+        <span>
+          Você está vendo o acervo disponível localmente ({questions.length} questões).
+          {lastBatch && (
+            <>
+              {' '}Última importação: {new Date(lastBatch.createdAt).toLocaleDateString('pt-BR')} ·{' '}
+              {lastBatch.created.length} questão(ões)
+              {lastBatch.document?.label ? ` de ${lastBatch.document.label}` : ''}.
+            </>
+          )}
+        </span>
         <div style={{ display: 'flex', gap: 14 }}>
+          {lastBatch && onUndoImport && (
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                const confirmed = window.confirm(
+                  `Desfazer a importação de ${new Date(lastBatch.createdAt).toLocaleString('pt-BR')}?\n\n` +
+                    `${lastBatch.created.length} questão(ões) criada(s) por ela serão removidas` +
+                    (lastBatch.replaced.length
+                      ? ` e ${lastBatch.replaced.length} voltará(ão) à versão anterior.`
+                      : '.') +
+                    '\n\nEdições feitas depois da importação não são revertidas.'
+                );
+                if (confirmed) onUndoImport();
+              }}
+              title="Remover as questões criadas pela última importação"
+            >
+              <Undo2 size={15} /> Desfazer última importação
+            </button>
+          )}
           {questions.length > 0 && onClearQuestions && (
             <button
               type="button"
