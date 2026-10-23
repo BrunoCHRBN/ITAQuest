@@ -1,0 +1,28 @@
+{
+  "questions": [
+    {
+      "subject": "Matemática",
+      "topic": "Álgebra",
+      "difficulty": "Intermediária",
+      "statement": "Enunciado completo da questão...",
+      "alternatives": {
+        "A": "Texto da alternativa A",
+        "B": "Texto da alternativa B",
+        "C": "Texto da alternativa C",
+        "D": "Texto da alternativa D",
+        "E": "Texto da alternativa E"
+      },
+      "answerKey": "C",
+      "explanation": "Resolução comentada, se disponível.",
+      "source": {
+        "label": "ITA",
+        "year": 2024,
+        "phase": "1ª fase",
+        "questionNumber": 1,
+        "fileName": "ita-2024.pdf",
+        "page": 3
+      },
+      "tags": ["álgebra"]
+    }
+  ]
+}
