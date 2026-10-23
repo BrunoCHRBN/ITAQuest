@@ -55,6 +55,10 @@ mas prometem menos do que o acervo precisa.
 
 ## 3. Diagnóstico — Aquisição de questões
 
+> **Leia também o Apêndice (ao final).** Ele audita a prova real do ITA 2025 e revisa a
+> arquitetura de aquisição recomendada aqui: a resposta certa não é "modelo ou parser", é
+> parser para a estrutura + modelo só para o enunciado + gabarito como oráculo.
+
 ### F1 [P0] Questão sem número rouba o gabarito da vizinha **[medido]**
 
 `server/geminiService.ts:386` — `const qNum = raw.questionNumber ?? idx + 1;`
@@ -418,3 +422,94 @@ estados não prova nada. Concretamente:
   grande.
 - **Não testei a extração de figuras.** A proposta de PNG por página assume que a rasterização do
   PDF é viável no ambiente; não verifiquei qual biblioteca está disponível.
+
+---
+
+# Apêndice — auditoria contra a prova real (ITA 2025, 1ª fase)
+
+Feita depois do diagnóstico acima, com os arquivos que já estavam em `~/Downloads`. Muda a
+recomendação de aquisição, por isso está separada.
+
+**Arquivos:** `2025_fase1.pdf` (28 pág., 1,8 MB), `gabarito_2025.pdf` (1 pág.),
+`programa_2026.pdf` (7 pág.). Os dois primeiros são **exatamente** os arquivos de uma extração
+já tentada em 18/10 — os uploads órfãos em `server/uploads/` têm os mesmos tamanhos
+(1788032 e 36514 bytes) e ficaram lá porque o `cleanup()` não roda quando o processo morre.
+
+## A1. A prova tem 48 questões, não 60
+
+O próprio caderno declara: *"Esta prova é composta de 48 questões de múltipla escolha (numeradas
+de 1 a 48) com 12 questões de Matemática, 12 de Física, 12 de Química e 12 de Inglês"*. A
+estimativa que eu havia feito antes (10 anos × 2 fases × ~60) superestima o acervo em ~20%: são
+**576 questões** em 10 anos de 1ª fase, não ~1.200.
+
+## A2. O texto é nativo — mas metade dele é invisível para um parser ingênuo **[medido]**
+
+O PDF é digital (Adobe Acrobat Pro 11), não digitalizado. Ainda assim:
+
+```
+ocorrências NFC "Questão" precomposto: 24
+ocorrências NFD "Questão" decomposto  : 24
+```
+
+O mesmo documento mistura as duas formas de normalização Unicode, 24 e 24. Matemática (1–12) e
+Química (25–36) vêm em NFC; Física (13–24) e Inglês (37–48) vêm em NFD (`a` + til combinante).
+Um `grep "Questão"` recupera **exatamente metade** da prova, e a outra metade desaparece sem
+erro. É o modo de falha F2 na prática, num documento real.
+
+O mesmo defeito atinge o app: a chave de dedup e a busca comparam strings cruas, então metade
+deste acervo seria **invisível à busca** e **nunca detectada como duplicata**. Uma linha resolve
+três problemas de uma vez:
+
+```ts
+const canonical = (s: string) => s.normalize('NFC');
+// ingestão, dedup e busca passam a operar sobre a forma canônica
+```
+
+## A3. O texto nativo não basta para o enunciado
+
+A camada de texto destrói a matemática: `i 2 = −1` (por i² = −1), `z 2`, frações viram `1p`
+sobre `2`, radicais caem em linha própria. Um parser determinístico produziria estrutura correta
+e conteúdo ilegível.
+
+## A4. O gabarito entrega três coisas que o pipeline ignora
+
+O gabarito oficial dá, de graça e de forma autoritativa:
+
+1. **contagem esperada** — 48 linhas;
+2. **fronteiras de matéria** — Matemática 1–12, Física 13–24, Química 25–36, Inglês 37–48;
+3. **questões anuladas** — 9 e 18, marcadas `(*)`, com a nota *"consideradas corretas para todos
+   os candidatos"*.
+
+Hoje o código **pede ao modelo que adivinhe a matéria** (`suggestedSubject`) quando o gabarito
+poderia determiná-la; não compara a contagem; e trata anulada como "sem gabarito", o que faz o
+`scoringService` excluir a questão do numerador **e** do denominador (nota calculada sobre 46 em
+vez de 48). Anulada não é ausência de dado: é um estado próprio (`annulled: true`).
+
+## A5. Figuras: 8 de 48 (~17%)
+
+Oito questões citam figura, gráfico ou esquema. É um problema real — um sexto do acervo fica
+incompleto sem a imagem — mas **não é bloqueante**, e não justifica adiar a importação. Isso
+rebaixa a mídia de "Sprint 4, antes de tudo" para "onda 2, junto com a revisão".
+
+## A6. Consequência para a arquitetura de aquisição
+
+A conclusão não é "modelo **ou** parser". É:
+
+> **Parser determinístico para a estrutura, modelo só para o enunciado, gabarito como oráculo, e
+> um diff obrigatório entre os dois.**
+
+O fluxo:
+
+1. `pdftotext -layout` + normalização NFC → esqueleto: números presentes, letras de alternativa,
+   contagem por matéria (do gabarito), páginas.
+2. Gabarito → `expectedCount`, fronteira de matéria por número, lista de anuladas.
+3. Modelo → transcreve o enunciado de cada questão (é o único que vê o sobrescrito).
+4. **Verificação**: toda questão do esqueleto apareceu na saída do modelo? O número de
+   alternativas bate? A matéria bate com a fronteira do gabarito? O que não bater vai para
+   quarentena com página e número — não para o banco.
+
+Com isso F1 e F2 deixam de ser "detectados" e passam a ser **estruturalmente impossíveis**: a
+numeração vem do documento, não do modelo, e a contagem é conferida contra a fonte oficial.
+
+Custo: o modelo continua sendo chamado, mas para uma tarefa menor (transcrever, não estruturar),
+o que reduz truncamento e alucinação — e o resultado fica verificável.
