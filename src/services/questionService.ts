@@ -1,4 +1,5 @@
 import type { Difficulty, Question, QuestionFilters, ResponseRecord, Subject } from '../types';
+import { canonicalText, foldText } from './textService';
 
 export const SUBJECTS: Subject[] = ['Matemática', 'Física', 'Química', 'Português', 'Inglês', 'Redação', 'Outra'];
 export const DIFFICULTIES: Difficulty[] = ['Básica', 'Intermediária', 'Avançada'];
@@ -15,7 +16,7 @@ export function emptyResponse(): ResponseRecord {
 export function normalizeQuestion(raw: any): Question | null {
   if (!raw || typeof raw !== 'object') return null;
 
-  const statement = String(raw.statement ?? raw.enunciado ?? raw.question ?? '').trim();
+  const statement = canonicalText(raw.statement ?? raw.enunciado ?? raw.question ?? '');
   if (!statement) return null;
 
   const rawAlternatives = raw.alternatives ?? raw.alternativas ?? raw.options;
@@ -24,20 +25,20 @@ export function normalizeQuestion(raw: any): Question | null {
   if (Array.isArray(rawAlternatives)) {
     rawAlternatives.forEach((value: any, index: number) => {
       const key = OPTION_LETTERS[index] ?? String(index + 1);
-      alternatives[key] = String(
+      alternatives[key] = canonicalText(
         typeof value === 'object' && value !== null ? value.text ?? value.texto ?? value.value ?? '' : value
-      ).trim();
+      );
     });
   } else if (rawAlternatives && typeof rawAlternatives === 'object') {
     Object.entries(rawAlternatives).forEach(([k, v]) => {
-      alternatives[k.toUpperCase().trim()] = String(v ?? '').trim();
+      alternatives[k.toUpperCase().trim()] = canonicalText(v ?? '');
     });
   }
 
-  const subjectInput = String(raw.subject ?? raw.materia ?? 'Outra').trim();
-  const matchedSubject = SUBJECTS.find((v) => v.toLowerCase() === subjectInput.toLowerCase()) ?? 'Outra';
+  const subjectInput = canonicalText(raw.subject ?? raw.materia ?? 'Outra');
+  const matchedSubject = SUBJECTS.find((v) => foldText(v) === foldText(subjectInput)) ?? 'Outra';
 
-  const diffInput = String(raw.difficulty ?? raw.dificuldade ?? 'Intermediária').toLowerCase();
+  const diffInput = foldText(raw.difficulty ?? raw.dificuldade ?? 'Intermediária');
   const difficulty: Difficulty =
     diffInput.includes('bás') || diffInput.includes('bas') || diffInput.includes('fácil') || diffInput.includes('facil')
       ? 'Básica'
@@ -48,13 +49,14 @@ export function normalizeQuestion(raw: any): Question | null {
   const sourceRaw = raw.source ?? raw.origem ?? {};
   const source: Question['source'] =
     typeof sourceRaw === 'string'
-      ? { label: sourceRaw.trim() || 'Importada' }
+      ? { label: canonicalText(sourceRaw) || 'Importada' }
       : {
-          label: String(sourceRaw.label ?? sourceRaw.institution ?? sourceRaw.instituicao ?? 'Importada').trim(),
+          label: canonicalText(sourceRaw.label ?? sourceRaw.institution ?? sourceRaw.instituicao ?? 'Importada') || 'Importada',
           year: Number(sourceRaw.year ?? sourceRaw.ano) || undefined,
-          phase: String(sourceRaw.phase ?? sourceRaw.fase ?? '').trim() || undefined,
+          phase: canonicalText(sourceRaw.phase ?? sourceRaw.fase ?? '') || undefined,
           questionNumber: Number(sourceRaw.questionNumber ?? sourceRaw.numero) || undefined,
-          fileName: String(sourceRaw.fileName ?? sourceRaw.arquivo ?? '').trim() || undefined,
+          order: Number(sourceRaw.order ?? sourceRaw.ordem) || undefined,
+          fileName: canonicalText(sourceRaw.fileName ?? sourceRaw.arquivo ?? '') || undefined,
           page: Number(sourceRaw.page ?? sourceRaw.pagina) || undefined,
         };
 
@@ -63,15 +65,16 @@ export function normalizeQuestion(raw: any): Question | null {
   return {
     id: String(raw.id ?? uid('import')),
     subject: matchedSubject,
-    topic: String(raw.topic ?? raw.assunto ?? 'Sem assunto definido').trim(),
+    topic: canonicalText(raw.topic ?? raw.assunto ?? 'Sem assunto definido'),
     difficulty,
     statement,
     alternatives,
     answerKey: answer || undefined,
-    explanation: String(raw.explanation ?? raw.resolucao ?? raw.explicacao ?? '').trim() || undefined,
+    explanation: canonicalText(raw.explanation ?? raw.resolucao ?? raw.explicacao ?? '') || undefined,
     source,
-    tags: Array.isArray(raw.tags) ? raw.tags.map((x: unknown) => String(x).trim()).filter(Boolean) : [],
+    tags: Array.isArray(raw.tags) ? raw.tags.map((x: unknown) => canonicalText(x)).filter(Boolean) : [],
     createdAt: String(raw.createdAt ?? new Date().toISOString()),
+    annulled: raw.annulled === true,
   };
 }
 
@@ -107,10 +110,12 @@ export function validateQuestion(q: Partial<Question>): { valid: boolean; errors
 }
 
 export function questionDeduplicationKey(q: Question): string {
-  const label = q.source.label.toLowerCase().trim();
+  const label = foldText(q.source.label);
   const year = q.source.year ?? '';
   const num = q.source.questionNumber ?? '';
-  const statement = q.statement.toLowerCase().trim().replace(/\s+/g, ' ');
+  // `foldText` remove acento, caixa e diferença de espaço: a mesma questão vinda do PDF em NFD
+  // e do CSV em NFC tem de colidir aqui.
+  const statement = foldText(q.statement);
   return `${label}|${year}|${num}|${statement}`;
 }
 
@@ -143,20 +148,22 @@ export function filterQuestions(
   filters: QuestionFilters,
   statusMap?: Map<string, { answered: boolean; isCorrect: boolean; isWrong: boolean; markedForReview: boolean }>
 ): Question[] {
-  const normalized = filters.query.toLocaleLowerCase('pt-BR').trim();
+  // `foldText` nos dois lados: sem isto, "algebra" não encontra "Álgebra" e um enunciado em NFD
+  // nunca casa com a consulta digitada no teclado (que produz NFC).
+  const normalized = foldText(filters.query);
 
   const filtered = questions.filter((q) => {
-    const haystack = [
-      q.statement,
-      q.topic,
-      q.subject,
-      q.source.label,
-      q.source.year ?? '',
-      q.source.questionNumber ? `questão ${q.source.questionNumber}` : '',
-      ...(q.tags ?? []),
-    ]
-      .join(' ')
-      .toLocaleLowerCase('pt-BR');
+    const haystack = foldText(
+      [
+        q.statement,
+        q.topic,
+        q.subject,
+        q.source.label,
+        q.source.year ?? '',
+        q.source.questionNumber ? `questão ${q.source.questionNumber}` : '',
+        ...(q.tags ?? []),
+      ].join(' ')
+    );
 
     // Text query
     if (normalized && !haystack.includes(normalized)) return false;

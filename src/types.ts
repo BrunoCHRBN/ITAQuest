@@ -15,13 +15,23 @@ export interface QuestionSource {
   label: string;
   year?: number;
   phase?: string;
+  /** Número impresso na prova. Pode faltar — o modelo nem sempre o lê. */
   questionNumber?: number;
+  /**
+   * Posição ordinal da questão no documento (1-based). Sempre presente quando a questão veio de
+   * extração. Existe para nunca confundir "não sei o número" com "é a questão N": usar o ordinal
+   * como número fazia duas questões reivindicarem o mesmo número e uma delas herdar o gabarito
+   * da outra.
+   */
+  order?: number;
   fileName?: string;
   page?: number;
   checksum?: string;
   promptVersion?: string;
   model?: string;
   gabaritoOficialSource?: string;
+  /** Checksum do documento de gabarito de onde a resposta veio. */
+  answerKeyChecksum?: string;
 }
 
 export interface Question {
@@ -40,6 +50,12 @@ export interface Question {
   alerts?: string[];
   hasOfficialKey?: boolean;
   referencedFigures?: string[];
+  /**
+   * Anulada pelo gabarito oficial. Não é o mesmo que "sem gabarito": a questão anulada conta
+   * como correta para todos os candidatos, e tratá-la como ausente de dado fazia a nota ser
+   * calculada sobre 46 em vez de 48.
+   */
+  annulled?: boolean;
 }
 
 export type TriageRound = 'imediata' | 'trabalhosa' | 'combate';
