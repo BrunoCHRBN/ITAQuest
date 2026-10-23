@@ -513,3 +513,47 @@ numeração vem do documento, não do modelo, e a contagem é conferida contra a
 
 Custo: o modelo continua sendo chamado, mas para uma tarefa menor (transcrever, não estruturar),
 o que reduz truncamento e alucinação — e o resultado fica verificável.
+
+---
+
+# 10. O que foi executado
+
+Os sete itens da ordem recomendada, um commit cada, com testes validados por mutação (o teste
+tem de falhar quando o defeito volta).
+
+| # | Item | Commit | O que mudou |
+|---|---|---|---|
+| 0 | Ponto de restauração | `f2d5831` | `git init` + baseline (o projeto não era repositório) |
+| 1 | Normalização | `9e0b44b` | `textService`: NFC no armazenamento, `foldText` na busca e na dedup. Fecha a metade invisível do acervo e a busca sem acento |
+| 2 | Identidade | `83fe28c` | `source.order` separado de `questionNumber`; número duplicado perde a identidade; casamento por ordinal só com contagens iguais; id determinístico; checksum do gabarito propagado |
+| 3 | Cobertura | `ad87aa0` | `auditCoverage`: contagem do gabarito como oráculo; status `completed_with_gaps`; lista compacta das ausentes no modal |
+| 4 | Conflitos + edição | `32bc4e7` | dedup devolve `conflicts` com diferenças; `ImportConflictsModal`; `AddQuestionModal` em modo edição; `revalidateQuestion` |
+| 5 | Triagem | `af8dad9` | `QuestionValidationFilter`; faixa de triagem no Banco com contagens clicáveis |
+| 6 | Lote | `56e63c5` | `ImportBatch` + `undoBatch`; "Desfazer última importação"; aviso de PDF já ingerido por checksum |
+| 7 | Anulada | `4bd92e7` | `annulled: true`; conta como acerto e entra no denominador nos quatro sítios de pontuação |
+
+**Estado:** 57 → **114 testes** (18 arquivos), typecheck limpo, build de produção OK.
+
+## O que continua pendente, e por quê
+
+- **F4 — extração fatiada por páginas.** É a mudança que exige mexer no `extractExamFromPdf` e no
+  ciclo do job. Continua sendo "tudo ou nada" por chamada.
+- **F5 — retenção do PDF e PNG por página.** Depende de decidir onde guardar os arquivos; hoje o
+  `cleanup()` apaga. Sem isso, revisar figura continua impossível.
+- **F7 — CSV com `;` (Excel pt-BR).** Ainda colapsa em uma coluna. É pequeno e independente; ficou
+  fora da ordem de sete itens, mas é o próximo da fila por custo/benefício.
+- **O4 — catálogo de assuntos.** O filtro de assunto ainda deriva de strings cruas.
+- **O7 — IndexedDB.** O teto de 5 MB e a falta de índices continuam. `writeStorage` ainda falha
+  depois do `setState` (a questão aparece e desaparece no reload).
+- **Entidade `Document` completa.** O `ImportBatch` cobre "desfazer lote" e "quais provas já
+  ingeri", mas a tabela de documentos (com `expected_count`, páginas, arquivo) fica para quando o
+  armazenamento mudar.
+
+## O que eu não verifiquei
+
+**Não olhei a interface num navegador de verdade.** Tentei: o Chromium headless deste ambiente
+morre na inicialização (`GPU process isn't usable`, mesmo com SwiftShader), então a verificação
+visual por CDP não rodou. O que existe é teste de render em jsdom cobrindo o comportamento — a
+faixa de triagem aparece e filtra, o "Desfazer" pede confirmação — mas **layout e espaçamento não
+foram vistos**. Antes de confiar na aparência, abra `npm run dev` e olhe o Banco com algumas
+questões com alerta.
