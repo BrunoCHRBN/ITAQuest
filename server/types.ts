@@ -7,10 +7,14 @@ export interface QuestionSource {
   label: string;
   year?: number;
   phase?: string;
+  /** Número impresso na prova. Pode faltar — nunca é presumido a partir do ordinal. */
   questionNumber?: number;
+  /** Posição ordinal no documento (1-based). Sempre presente quando veio de extração. */
+  order?: number;
   fileName?: string;
   page?: number;
   checksum?: string;
+  answerKeyChecksum?: string;
   promptVersion?: string;
   model?: string;
   gabaritoOficialSource?: string;

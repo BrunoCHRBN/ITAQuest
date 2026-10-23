@@ -357,6 +357,7 @@ export function reconcileExtractedData(params: {
   answerKeys?: ExtractedAnswerKeyItem[];
   examFileName: string;
   examChecksum: string;
+  answerKeyChecksum?: string;
   metadata: {
     institution: string;
     year?: number;
@@ -366,25 +367,63 @@ export function reconcileExtractedData(params: {
   model: string;
 }): { questions: ReconciledQuestion[]; reviewQueue: ReconciledQuestion[] } {
   const keyMap = new Map<number, ExtractedAnswerKeyItem>();
-  if (params.answerKeys) {
-    params.answerKeys.forEach((item) => {
-      keyMap.set(item.questionNumber, item);
-    });
-  }
-
-  // Sort questions by official question number if present
-  const sortedRaw = [...params.rawQuestions].sort((a, b) => {
-    const aNum = a.questionNumber ?? 99999;
-    const bNum = b.questionNumber ?? 99999;
-    return aNum - bNum;
+  params.answerKeys?.forEach((item) => {
+    keyMap.set(item.questionNumber, item);
   });
+
+  const keyCount = params.answerKeys?.length ?? 0;
+
+  /**
+   * Casar questão e gabarito pelo ordinal só é legítimo quando as contagens batem: aí cada
+   * questão extraída tem exatamente uma linha de gabarito, na mesma ordem, e a correspondência
+   * é bijetiva por construção. Fora disso, casar por posição é adivinhação.
+   */
+  const ordinalMatchSafe = keyCount > 0 && keyCount === params.rawQuestions.length;
+
+  /**
+   * A ordem do documento. Só reordenamos quando TODAS as questões têm número — nesse caso a
+   * ordenação recupera a posição real mesmo se o modelo devolveu fora de ordem. Se alguma não
+   * tem, não há como saber a posição, e inventá-la é exatamente o defeito que este código
+   * corrige (duas questões reivindicando o mesmo número e uma herdando o gabarito da outra).
+   */
+  const allNumbered = params.rawQuestions.every(
+    (q) => typeof q.questionNumber === 'number' && Number.isFinite(q.questionNumber)
+  );
+  const ordered = allNumbered
+    ? [...params.rawQuestions].sort(
+        (a, b) => (a.questionNumber as number) - (b.questionNumber as number)
+      )
+    : [...params.rawQuestions];
+
+  /** Número impresso -> ordinal da primeira questão que o reivindicou. */
+  const claimedNumbers = new Map<number, number>();
 
   const questions: ReconciledQuestion[] = [];
   const reviewQueue: ReconciledQuestion[] = [];
 
-  sortedRaw.forEach((raw, idx) => {
-    const qNum = raw.questionNumber ?? idx + 1;
+  ordered.forEach((raw, idx) => {
+    const order = idx + 1;
+    const qNum =
+      typeof raw.questionNumber === 'number' && Number.isFinite(raw.questionNumber)
+        ? raw.questionNumber
+        : undefined;
+
     const alerts: string[] = [];
+
+    // ---- Identidade -------------------------------------------------------
+    let duplicateNumber = false;
+    if (qNum === undefined) {
+      alerts.push(
+        'Número da questão não identificado no documento. O ordinal foi registrado em source.order, mas não foi usado como número.'
+      );
+    } else if (claimedNumbers.has(qNum)) {
+      duplicateNumber = true;
+      alerts.push(
+        `Número ${qNum} duplicado: outra questão já reivindica este número. Gabarito não atribuído por ambiguidade.`
+      );
+    } else {
+      claimedNumbers.set(qNum, order);
+    }
 
     // Clean alternatives
     const cleanAlts: Record<string, string> = {};
@@ -423,8 +462,18 @@ export function reconcileExtractedData(params: {
       alerts.push(`Referencia figura(s): ${figures.join(', ')}. Verifique o diagrama no PDF original.`);
     }
 
-    // Match official answer key
-    const officialKeyItem = keyMap.get(qNum);
+    // ---- Gabarito oficial ------------------------------------------------
+    let officialKeyItem: ExtractedAnswerKeyItem | undefined;
+    if (qNum !== undefined && !duplicateNumber) {
+      officialKeyItem = keyMap.get(qNum);
+    } else if (qNum === undefined && ordinalMatchSafe) {
+      officialKeyItem = keyMap.get(order);
+    } else if (qNum === undefined && keyCount > 0) {
+      alerts.push(
+        `Gabarito não atribuído: a questão não tem número e a contagem não permite casar por ordem (${params.rawQuestions.length} extraídas, ${keyCount} no gabarito).`
+      );
+    }
+
     let answerKey: string | undefined;
     let hasOfficialKey = false;
     let officialSource: string | undefined;
@@ -443,7 +492,7 @@ export function reconcileExtractedData(params: {
           answerKey = letter;
         }
       }
-    } else if (params.answerKeys && params.answerKeys.length > 0) {
+    } else if (params.answerKeys && params.answerKeys.length > 0 && qNum !== undefined && !duplicateNumber) {
       alerts.push('Não foi encontrado gabarito oficial para esta questão no arquivo de gabarito.');
     }
 
@@ -455,7 +504,11 @@ export function reconcileExtractedData(params: {
       alerts.length === 0 ? 'valida' : !raw.statement?.trim() ? 'incompleta' : 'com_alertas';
 
     const reconciled: ReconciledQuestion = {
-      id: `gemini-${params.metadata.institution.toLowerCase()}-${params.metadata.year ?? 'ano'}-q${qNum}-${Date.now().toString(36)}`,
+      // Id determinístico: o mesmo documento reprocessado produz os mesmos ids, o que torna
+      // possível reconciliar uma re-extração em vez de acumular duplicatas. Sem `Date.now()`.
+      id: `gemini-${slugify(params.metadata.institution)}-${params.metadata.year ?? 'ano'}-${slugify(
+        params.metadata.phase ?? 'fase'
+      )}-o${order}`,
       subject: matchedSubject,
       topic: raw.suggestedTopic?.trim() || 'Assunto sugerido por IA',
       difficulty,
@@ -467,10 +520,14 @@ export function reconcileExtractedData(params: {
         label: params.metadata.institution,
         year: params.metadata.year,
         phase: params.metadata.phase,
-        questionNumber: qNum,
+        // Numero reivindicado por outra questao nao e identidade confiavel: fica nulo e o
+        // ordinal responde por ela. Mantem a invariante "um numero, uma questao".
+        questionNumber: duplicateNumber ? undefined : qNum,
+        order,
         fileName: params.examFileName,
         page: raw.page,
         checksum: params.examChecksum,
+        answerKeyChecksum: params.answerKeyChecksum,
         promptVersion: params.promptVersion,
         model: params.model,
         gabaritoOficialSource: officialSource,
@@ -491,4 +548,16 @@ export function reconcileExtractedData(params: {
   });
 
   return { questions, reviewQueue };
+}
+
+/** ASCII, minúsculo, hifenizado — para compor ids estáveis. */
+function slugify(value: string): string {
+  return (
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'nd'
+  );
 }
