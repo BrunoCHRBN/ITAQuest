@@ -139,5 +139,5 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 app.listen(PORT, () => {
-  console.log(`Backend Rotina ITA ativo na porta ${PORT}`);
+  console.log(`Backend ITAQuest ativo na porta ${PORT}`);
 });

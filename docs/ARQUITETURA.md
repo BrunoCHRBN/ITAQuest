@@ -2,7 +2,7 @@
 
 [English version](ARCHITECTURE.md)
 
-Este documento estabelece as decisões arquiteturais, o modelo de domínio e as invariantes de integridade do projeto **Rotina ITA**.
+Este documento estabelece as decisões arquiteturais, o modelo de domínio e as invariantes de integridade do projeto **ITAQuest**.
 
 ---
 
@@ -167,7 +167,7 @@ O fluxo de processamento de exames segue 4 etapas sequenciais:
 ## 4. Persistência e Limites Operacionais
 
 ### 4.1 Estado Atual: `localStorage`
-- O armazenamento utiliza chaves versionadas (`rotina_ita_questions_v1`, `rotina_ita_sessions_v1`, etc.).
+- O armazenamento utiliza chaves versionadas (`itaquest.questions.v1`, `itaquest.sessions.v1`, etc.) com migração automática transparente de prefixos anteriores.
 - Cada gravação é envolvida em bloco `try/catch` com captura de `QuotaExceededError`.
 - Em caso de falha de espaço, o serviço emite alerta e impede a corrupção do estado em memória.
 - Capacidade típica: ~1.600 a ~3.200 questões completas (considerando limite de 5 MB por domínio).

@@ -42,14 +42,14 @@ export function Sidebar({
     <aside className={`sidebar ${mobileMenuOpen ? 'sidebar-open' : ''}`}>
       <div className="brand">
         <div className="brand-symbol">
-          <span>R</span>
+          <span>Q</span>
           <i />
         </div>
         <div>
           <div className="brand-name">
-            rotina <b>ITA</b>
+            ITA<b>Quest</b>
           </div>
-          <div className="brand-sub">CADERNO DE PREPARAÇÃO</div>
+          <div className="brand-sub">ACERVO E SIMULADOS</div>
         </div>
         <button className="icon-button sidebar-close" aria-label="Fechar menu" onClick={onCloseMobile}>
           <X size={17} />

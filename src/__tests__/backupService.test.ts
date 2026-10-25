@@ -37,7 +37,7 @@ describe('backupService', () => {
   it('creates complete backup format with version 1.0 and all entities', () => {
     const backup = createBackup(dummyQuestions, dummySessions);
     expect(backup.version).toBe('1.0');
-    expect(backup.app).toBe('rotina-ita');
+    expect(backup.app).toBe('itaquest');
     expect(backup.exportedAt).toBeDefined();
     expect(backup.questions).toEqual(dummyQuestions);
     expect(backup.sessions).toEqual(dummySessions);
@@ -46,12 +46,12 @@ describe('backupService', () => {
   it('validates backup schema and rejects invalid or corrupted files', () => {
     expect(validateBackup(null).valid).toBe(false);
     expect(validateBackup({ app: 'wrong-app' }).valid).toBe(false);
-    expect(validateBackup({ app: 'rotina-ita', version: '99.0' }).valid).toBe(false);
-    expect(validateBackup({ app: 'rotina-ita', version: '1.0', questions: 'not-array' }).valid).toBe(false);
+    expect(validateBackup({ app: 'itaquest', version: '99.0' }).valid).toBe(false);
+    expect(validateBackup({ app: 'itaquest', version: '1.0', questions: 'not-array' }).valid).toBe(false);
 
     const validRaw = {
       version: '1.0',
-      app: 'rotina-ita',
+      app: 'itaquest',
       questions: [
         {
           statement: 'Questão válida no backup',

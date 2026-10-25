@@ -2,7 +2,7 @@
 
 [English version](docs/DEVELOPMENT_GUIDE.md) | [Documentação de Arquitetura](docs/ARQUITETURA.md)
 
-Este documento resume o estado técnico e as garantias do projeto **Rotina ITA** para engenheiros e agentes de IA que assumirem o desenvolvimento.
+Este documento resume o estado técnico e as garantias do projeto **ITAQuest** para engenheiros e agentes de IA que assumirem o desenvolvimento.
 
 ---
 

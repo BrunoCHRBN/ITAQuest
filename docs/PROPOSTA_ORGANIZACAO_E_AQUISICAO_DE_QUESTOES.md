@@ -2,13 +2,13 @@
 
 [English version](QUESTION_ACQUISITION_AND_ORGANIZATION.md)
 
-**Escopo:** `rotina-ita-app` (React 19 + TypeScript + Vite + Express/Gemini).  
+**Escopo:** ITAQuest (React 19 + TypeScript + Vite + Express/Gemini).  
 Diagnóstico técnico sobre a organização do acervo e ingestão de exames, acompanhado do modelo de dados normalizado, auditoria empírica contra prova real do ITA e registro de execuções.
 
 Para reproduzir as medições executadas neste documento:
 
 ```bash
-cd /home/bruno-vsantos/rotina-ita-app && npx tsx scripts/probe-diagnostico.ts
+npx tsx scripts/probe-diagnostico.ts
 ```
 
 Todos os achados assinalados com **[medido]** foram validados diretamente contra a implementação de código e dados reais.

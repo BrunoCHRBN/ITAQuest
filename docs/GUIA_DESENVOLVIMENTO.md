@@ -2,7 +2,7 @@
 
 [English version](DEVELOPMENT_GUIDE.md)
 
-Este documento orienta desenvolvedores e agentes autônomos na manutenção e evolução do projeto **Rotina ITA**.
+Este documento orienta desenvolvedores e agentes autônomos na manutenção e evolução do projeto **ITAQuest**.
 
 ---
 

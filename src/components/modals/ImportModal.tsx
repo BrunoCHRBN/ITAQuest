@@ -35,7 +35,7 @@ export function ImportModal({ onClose, onImport, onError }: ImportModalProps) {
 
   const handleDownloadTemplate = () => {
     const template = JSON.parse(generateTemplateJson());
-    downloadJsonFile(template, 'modelo-importacao-rotina-ita.json');
+    downloadJsonFile(template, 'modelo-importacao-itaquest.json');
   };
 
   return (

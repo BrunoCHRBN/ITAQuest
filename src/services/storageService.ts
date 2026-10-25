@@ -1,4 +1,11 @@
 export const STORAGE_KEYS = {
+  questions: 'itaquest.questions.v1',
+  sessions: 'itaquest.sessions.v1',
+  batches: 'itaquest.batches.v1',
+  schemaVersion: 'itaquest.schema_version',
+} as const;
+
+const LEGACY_STORAGE_KEYS = {
   questions: 'rotina-ita.questions.v1',
   sessions: 'rotina-ita.sessions.v1',
   batches: 'rotina-ita.batches.v1',
@@ -110,6 +117,20 @@ export function clearQuestionsStorage(): boolean {
 export function initializeStorageMigration() {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return;
+
+    // Migração de chaves do prefixo legado "rotina-ita" para "itaquest"
+    if (localStorage.getItem(STORAGE_KEYS.questions) === null && localStorage.getItem(LEGACY_STORAGE_KEYS.questions) !== null) {
+      const legacyQ = localStorage.getItem(LEGACY_STORAGE_KEYS.questions);
+      const legacyS = localStorage.getItem(LEGACY_STORAGE_KEYS.sessions);
+      const legacyB = localStorage.getItem(LEGACY_STORAGE_KEYS.batches);
+      const legacyV = localStorage.getItem(LEGACY_STORAGE_KEYS.schemaVersion);
+
+      if (legacyQ !== null) localStorage.setItem(STORAGE_KEYS.questions, legacyQ);
+      if (legacyS !== null) localStorage.setItem(STORAGE_KEYS.sessions, legacyS);
+      if (legacyB !== null) localStorage.setItem(STORAGE_KEYS.batches, legacyB);
+      if (legacyV !== null) localStorage.setItem(STORAGE_KEYS.schemaVersion, legacyV);
+    }
+
     const currentVersionStr = localStorage.getItem(STORAGE_KEYS.schemaVersion);
     const version = currentVersionStr ? parseInt(currentVersionStr, 10) : 0;
 

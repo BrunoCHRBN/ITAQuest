@@ -4,7 +4,7 @@ import { deduplicateQuestions, normalizeQuestion } from './questionService';
 export function createBackup(questions: Question[], sessions: StudySession[]): BackupData {
   return {
     version: '1.0',
-    app: 'rotina-ita',
+    app: 'itaquest',
     exportedAt: new Date().toISOString(),
     questions,
     sessions,
@@ -20,8 +20,8 @@ export function validateBackup(raw: unknown): { valid: boolean; errors: string[]
 
   const data = raw as Partial<BackupData>;
 
-  if (data.app !== 'rotina-ita') {
-    errors.push('O arquivo não foi reconhecido como um backup válido do Rotina ITA.');
+  if (data.app !== 'itaquest' && data.app !== 'rotina-ita') {
+    errors.push('O arquivo não foi reconhecido como um backup válido do ITAQuest.');
   }
 
   if (!data.version) {

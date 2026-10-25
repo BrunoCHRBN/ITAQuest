@@ -148,7 +148,7 @@ export interface QuestionFilters {
 
 export interface BackupData {
   version: '1.0';
-  app: 'rotina-ita';
+  app: 'itaquest' | 'rotina-ita';
   exportedAt: string;
   questions: Question[];
   sessions: StudySession[];

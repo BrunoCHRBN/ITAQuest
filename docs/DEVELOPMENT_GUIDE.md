@@ -2,7 +2,7 @@
 
 [Versão em Português](GUIA_DESENVOLVIMENTO.md)
 
-This document provides operational guidelines for developers and autonomous agents working on the **Rotina ITA** codebase.
+This document provides operational guidelines for developers and autonomous agents working on the **ITAQuest** codebase.
 
 ---
 

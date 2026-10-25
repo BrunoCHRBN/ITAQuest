@@ -2,7 +2,7 @@
 
 [Versão em Português](ARQUITETURA.md)
 
-This document establishes the architectural decisions, domain models, and integrity invariants of the **Rotina ITA** project.
+This document establishes the architectural decisions, domain models, and integrity invariants of the **ITAQuest** project.
 
 ---
 
@@ -167,7 +167,7 @@ The examination parsing lifecycle runs across four deterministic phases:
 ## 4. Persistence and Operational Boundaries
 
 ### 4.1 Current Implementation: `localStorage`
-- Uses versioned keys (`rotina_ita_questions_v1`, `rotina_ita_sessions_v1`, etc.).
+- Uses versioned keys (`itaquest.questions.v1`, `itaquest.sessions.v1`, etc.) with automatic backward-compatible migration of legacy prefixes.
 - Writes are guarded by `try/catch` handlers monitoring `QuotaExceededError`.
 - Storage failures trigger user alerts while keeping the in-memory state safe from partial write corruption.
 - Practical capacity: ~1,600 to ~3,200 full questions (assuming standard 5 MB per-origin limits).

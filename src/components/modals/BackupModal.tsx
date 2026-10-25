@@ -34,7 +34,7 @@ export function BackupModal({
   const handleExport = () => {
     const backup = createBackup(questions, sessions);
     const dateStr = new Date().toISOString().split('T')[0];
-    downloadJsonFile(backup, `rotina-ita-backup-${dateStr}.json`);
+    downloadJsonFile(backup, `itaquest-backup-${dateStr}.json`);
   };
 
   const handleFileSelect = async (file?: File) => {

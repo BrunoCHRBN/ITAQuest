@@ -387,7 +387,7 @@ export function App() {
   }
 
   function exportQuestionsOnly() {
-    downloadJsonFile({ questions }, 'rotina-ita-questoes.json');
+    downloadJsonFile({ questions }, 'itaquest-questoes.json');
     notify('Exportação das questões iniciada.');
   }
 
@@ -559,7 +559,7 @@ export function App() {
             currentView={view}
             onHelpClick={() =>
               notify(
-                'Protótipo Rotina ITA: os dados são armazenados neste navegador. Use o botão de Backup para exportar ou restaurar todos os seus dados.',
+                'ITAQuest: os dados são armazenados neste navegador. Use o botão de Backup para exportar ou restaurar todos os seus dados.',
                 'info'
               )
             }

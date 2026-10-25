@@ -21,7 +21,7 @@ export function TopBar({ currentView, onHelpClick, onBackupClick }: TopBarProps)
   return (
     <header className="topbar">
       <div className="breadcrumbs">
-        <span>Rotina ITA</span>
+        <span>ITAQuest</span>
         <span className="crumb-slash">/</span>
         <b>{VIEW_NAMES[currentView] ?? 'Estudo'}</b>
       </div>

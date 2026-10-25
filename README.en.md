@@ -1,8 +1,8 @@
-# Rotina ITA
+# ITAQuest
 
 [Versão em Português](README.md)
 
-Web application for organizing question archives, assembling study sessions, and solving exam questions targeted at the Instituto Tecnológico de Aeronáutica (ITA) entrance examinations.
+Web workbench and application for organizing question archives, assembling study sessions, and solving exam questions targeted at the Instituto Tecnológico de Aeronáutica (ITA) entrance examinations.
 
 The user interface follows an academic editorial design: ivory background, deep teal, terracotta accents, serif typography for titles, high information density, and native mathematical formula rendering via KaTeX.
 
@@ -106,8 +106,8 @@ The system consists of three primary layers:
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/BrunoCHRBN/rotina-ita-app.git
-cd rotina-ita-app
+git clone https://github.com/BrunoCHRBN/ITAQuest.git
+cd ITAQuest
 npm install
 ```
 
@@ -186,7 +186,7 @@ To enable automated PDF extraction using the Gemini API:
 ## Repository Structure
 
 ```text
-rotina-ita-app/
+ITAQuest/
 ├── index.html                  # HTML entry point
 ├── package.json                # Project dependencies and npm scripts
 ├── vite.config.ts              # Vite configuration with /api reverse proxy

@@ -1,6 +1,6 @@
-import { deduplicateQuestions, filterQuestions, questionDeduplicationKey } from '/home/bruno-vsantos/rotina-ita-app/src/services/questionService.ts';
-import { csvToRows } from '/home/bruno-vsantos/rotina-ita-app/src/services/importService.ts';
-import { reconcileExtractedData } from '/home/bruno-vsantos/rotina-ita-app/server/geminiService.ts';
+import { deduplicateQuestions, filterQuestions, questionDeduplicationKey } from '../src/services/questionService.js';
+import { csvToRows } from '../src/services/importService.js';
+import { reconcileExtractedData } from '../server/geminiService.js';
 
 const line = (t: string) => console.log('\n=== ' + t + ' ===');
 

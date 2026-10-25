@@ -2,13 +2,13 @@
 
 [Versão em Português](PROPOSTA_ORGANIZACAO_E_AQUISICAO_DE_QUESTOES.md)
 
-**Scope:** `rotina-ita-app` (React 19 + TypeScript + Vite + Express/Gemini).  
+**Scope:** ITAQuest (React 19 + TypeScript + Vite + Express/Gemini).  
 Technical diagnostic covering question archive organization, examination ingestion, normalized relational schema, empirical audit against the official ITA exam, and historical implementation logs.
 
 To reproduce the diagnostic measurements in this document:
 
 ```bash
-cd /home/bruno-vsantos/rotina-ita-app && npx tsx scripts/probe-diagnostico.ts
+npx tsx scripts/probe-diagnostico.ts
 ```
 
 All findings marked with **[measured]** were validated directly against the codebase and real exam data.

@@ -1,12 +1,12 @@
-# Prompt de Continuidade de Desenvolvimento — Rotina ITA
+# Prompt de Continuidade de Desenvolvimento — ITAQuest
 
-Este documento contém o contexto de entrada e instruções para orientar agentes autônomos ou desenvolvedores na continuidade das tarefas do projeto **Rotina ITA**.
+Este documento contém o contexto de entrada e instruções para orientar agentes autônomos ou desenvolvedores na continuidade das tarefas do projeto **ITAQuest**.
 
 ---
 
 ## Contexto do Projeto
 
-Você está dando continuidade ao desenvolvimento do projeto **Rotina ITA** (`rotina-ita-app`). Não recrie a aplicação do zero e preserve rigorosamente o sistema visual editorial acadêmico (fundo marfim, verde-petróleo, terracota em detalhes pontuais, tipografia serifada nos títulos, ausência de glassmorphism e gradientes chamativos).
+Você está dando continuidade ao desenvolvimento do projeto **ITAQuest**. Não recrie a aplicação do zero e preserve rigorosamente o sistema visual editorial acadêmico (fundo marfim, verde-petróleo, terracota em detalhes pontuais, tipografia serifada nos títulos, ausência de glassmorphism e gradientes chamativos).
 
 Antes de implementar qualquer alteração, leia integralmente:
 1. `README.md`
