@@ -1,62 +1,42 @@
-# Handoff para continuidade com Gemini
+# Handoff de Engenharia e Continuidade
 
-Leia primeiro `README.md`, `src/types.ts`, `src/data/seed.ts` e `src/App.tsx`. Preserve a direção visual editorial acadêmica já implementada: fundo marfim, verde-petróleo, terracota em pequenos acentos, títulos serifados, interface sóbria e responsiva. Evite gradientes chamativos, glassmorphism, excesso de cards e componentes genéricos de “AI slop”.
+[English version](docs/DEVELOPMENT_GUIDE.md) | [Documentação de Arquitetura](docs/ARQUITETURA.md)
 
-## Estado atual
+Este documento resume o estado técnico e as garantias do projeto **Rotina ITA** para engenheiros e agentes de IA que assumirem o desenvolvimento.
 
-A aplicação React + TypeScript + Vite já tem navegação de visão geral, banco de questões, sessões/simulados, revisão, desempenho, resolução individual e resultados. O estado de questões e sessões é persistido em `localStorage`. A importação em lote aceita JSON e CSV estruturados; o seed contém apenas questões sintéticas de demonstração.
+---
 
-## Regras funcionais que devem permanecer
+## Estado Atual da Base
 
-1. `Question` é o registro de conteúdo; a resposta do estudante vive em `ResponseRecord` vinculada à questão dentro de `StudySession`.
-2. A seleção e a ordem das questões são próprias de cada sessão.
-3. No modo `treino`, o estudante pode conferir gabarito e explicação após registrar uma alternativa.
-4. No modo `simulado`, não revelar gabarito ou explicação antes do término.
-5. Toda alternativa, anotação discursiva, marcação de revisão e navegação deve ser salva automaticamente.
-6. Importação não deve substituir silenciosamente dados existentes. Preserve origem, ano, fase, número da questão, arquivo e página quando fornecidos.
-7. O gabarito oficial deve ser guardado como dado da fonte, com procedência explícita; conteúdo gerado por IA não deve se passar por oficial.
-8. Nunca colocar chave da API Gemini no bundle cliente. A integração com modelos deve passar por endpoints de backend e variáveis de ambiente.
-9. Não assumir que uma questão foi importada corretamente só porque o JSON é válido. Registrar alertas estruturais e deixar rastreável o documento de origem.
-10. Antes de implementar um grande refactor, explicar um plano curto e executar testes/build após cada etapa concluída.
+- **Linha de base:** 114 testes automatizados em 18 arquivos (Vitest), todos aprovados. Verificação estática de tipos (`tsc --noEmit`) limpa e build de produção (`vite build`) funcional.
+- **Frontend:** React 19 + TypeScript + Vite. Interface baseada em sistema de design editorial acadêmico (marfim, verde-petróleo, terracota, tipografia serifada, KaTeX para fórmulas matemáticas).
+- **Backend:** Node.js + Express 5 em `server/`. Suporta extração de cadernos de prova em PDF via API Gemini 3.8 Flash (`@google/genai`) com reconciliação determinística contra o gabarito oficial.
+- **Persistência atual:** `localStorage` com tratamento de falhas de quota, versionamento de chaves e normalização canônica Unicode NFC.
 
-## Próximas etapas recomendadas
+---
 
-### Sprint 1 — Separar camadas e persistência (CONCLUÍDA)
+## Invariantes Obrigatórias
 
-- [x] Extraídos componentes de `App.tsx` para arquivos modulares independentes (`components/layout`, `components/views`, `components/modals`, `components/question`, `components/session`).
-- [x] Criada camada `services` para armazenamento com resiliência, validação de questões, importação CSV/JSON, deduplicação, estatísticas de pontuação e backup.
-- [x] Implementada exportação e restauração completa de backup JSON (questões, sessões, ordem, respostas, anotações, revisões e resultados) com suporte a mesclagem segura (`merge`) e substituição explícita (`replace`).
-- [x] Adicionados 35 testes automatizados (Vitest + Testing Library) cobrindo parsing CSV/JSON, normalização, deduplicação, pontuação e discursivas, ciclo de vida de sessões e timers, backup/restore e retenção de foco ao digitar.
-- [x] Documentado `.env.example` sem exposição de credenciais cliente.
+1. **Separação de Identidade:** `source.order` representa a sequência ordinal no documento; `source.questionNumber` representa o número impresso no caderno. Sem número impresso, a questão permanece com `questionNumber: undefined` e entra em quarentena (`validationState: 'incompleta'`), prevenindo deslocamento e apropriação indevida de gabaritos vizinhos.
+2. **Oráculo de Gabarito:** Gabaritos oficiais vêm exclusivamente do documento de gabarito fornecido pela banca. Modelos de linguagem jamais inventam ou inferem gabaritos oficiais. A contagem de itens do gabarito é o oráculo de completude (`expectedCount`).
+3. **Anulações:** Questões com `annulled: true` contam como acerto e integram numerador e denominador na pontuação (`scoringService`).
+4. **Normalização:** Todo texto armazenado é convertido para Unicode NFC. Buscas e deduplicações operam sobre projeção canônica sem diacríticos (`foldText`).
+5. **Gestão de Conflitos:** A reimportação de versões corrigidas de questões não descarta dados silenciosamente; conflitos são encaminhados para o modal de decisão do usuário.
+6. **Lotes e Reversibilidade:** Importações geram registros `ImportBatch` com checksum SHA-256, permitindo desfazer o último lote importado de forma atômica.
+7. **Segurança de Credenciais:** `GEMINI_API_KEY` reside unicamente no ambiente do servidor (`server/.env`), nunca no bundle do cliente.
+8. **Integridade de Foco:** Campos de digitação de respostas discursivas e formulários de edição mantêm foco contínuo do cursor durante re-renderizações.
 
-### Sprint 2 — Importador de provas via Gemini (CONCLUÍDA)
+---
 
-- [x] Backend com endpoints em Node.js/Express (`server/index.ts`, `server/jobManager.ts`, `server/geminiService.ts`).
-- [x] Endpoints implementados: `GET /api/health`, `POST /api/extract/jobs`, `GET /api/extract/jobs/:id`, `POST /api/extract/jobs/:id/cancel`.
-- [x] Recebimento de PDFs da prova e do gabarito oficial como fontes estritamente separadas.
-- [x] Extração multimodal com saída estruturada usando a SDK oficial `@google/genai` e modelo `gemini-3.8-flash`.
-- [x] Metadados persistidos: checksum SHA-256 do arquivo original, página no PDF, número da questão, estado de validação, confiança e versão do prompt (`ita-extractor-v1.0`).
-- [x] Reconciliação e validação determinística: gabaritos são estritamente atribuídos pelo documento oficial (procedência explícita); nenhum gabarito é inventado ou inferido.
-- [x] Fila de revisão por exceção (`reviewQueue`): itens com alertas estruturais ou menções a diagramas/figuras são destacados sem bloquear a importação em lote de questões válidas.
-- [x] Upload protegido com limite de tamanho (50 MB), cancelamento, tratamento de erros e limpeza segura de arquivos temporários.
-- [x] Isolamento seguro de `GEMINI_API_KEY` exclusivamente no ambiente de servidor (`server/.env`), protegido por `.gitignore`.
-- [x] Interface de usuário editorial acadêmica com modal de upload, acompanhamento em tempo real do progresso da extração e visualização de exceções antes da importação para o banco local.
+## Próximos Passos de Desenvolvimento
 
-### Sprint 3 — Banco persistente (Próxima etapa)
+Consulte os roteiros detalhados:
+- [Diagnóstico Técnico e Roadmap](docs/PROPOSTA_ORGANIZACAO_E_AQUISICAO_DE_QUESTOES.md)
+- [Diretrizes de Desenvolvimento](docs/GUIA_DESENVOLVIMENTO.md)
 
-### Sprint 3 — Banco persistente
-
-- Escolher banco relacional após validar as necessidades de arquivos/imagens.
-- Criar tabelas distintas para questões, alternativas, fontes/edições de prova, imagens/arquivos, sessões, itens da sessão, respostas e revisões.
-- Definir migrações, índices de deduplicação e contratos da API.
-- Não misturar o histórico de respostas com o cadastro canônico da questão.
-
-### Sprint 4 — Questões com mídia e matemática
-
-- Preservar imagens e diagramas extraídos ou recortados por página, com referência e licença/fonte.
-- Adotar renderização segura para matemática (por exemplo, KaTeX) e sanitização de HTML/Markdown.
-- Tratar questões discursivas e redações como tipos de resposta próprios, sem obrigar alternativas múltiplas.
-
-## Critério de aceite do próximo trabalho
-
-O projeto deve instalar, iniciar e compilar com sucesso. A resolução individual deve continuar responsiva e não perder foco/cursor em atualizações de estado. Acrescentar testes para regressões. Documentar env vars em `.env.example` sem valores secretos.
+Principais itens do backlog:
+1. **F7:** Suporte a delimitador ponto e vírgula (`;`) no `importService` e suporte a planilhas `.xlsx`.
+2. **F5:** Retenção local de PDFs e geração de recortes PNG por página para visualização de figuras.
+3. **O7:** Migração da camada de persistência para IndexedDB.
+4. **O4:** Catálogo hierárquico de tópicos do edital oficial do ITA.
+5. **F4:** Extração fatiada em blocos de páginas com persistência incremental no job.
